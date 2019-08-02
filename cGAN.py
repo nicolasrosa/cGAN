@@ -3,11 +3,9 @@
 # ========== #
 from __future__ import print_function, division
 
+import argparse
 import datetime
 import os
-import time
-import argparse
-
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -18,7 +16,7 @@ from keras_preprocessing.image import img_to_array, load_img
 from tqdm import tqdm
 
 from dataset_handler import load_dataset
-from model import build_generator, build_discriminator
+from model import cGAN
 
 # ================= #
 #  Global Variables #
@@ -36,11 +34,16 @@ tf.logging.set_verbosity(tf.logging.ERROR)  # TODO: comment this line
 
 plt.ion()
 
+
+# ========== #
+#  Functions #
+# ========== #
 def args_handler():
     parser = argparse.ArgumentParser()
     parser.add_argument("-m", "--mode", type=str, help="Chooses program mode.")
 
     return parser.parse_args()
+
 
 # ===== #
 #  Main #
@@ -55,6 +58,8 @@ def train():
     # Sets Training Variables
     epochs = 300
     batch_size = 4
+    learning_rate = 0.0002
+    beta = 0.5
     sample_interval = 1
 
     # --------
@@ -66,16 +71,18 @@ def train():
     # Construct Computational
     #   Graph of Generator
     # -------------------------
-    optimizer = tf.keras.optimizers.Adam(0.0002, 0.5)
+    model = cGAN(img_shape, depth_shape)
+
+    optimizer = tf.keras.optimizers.Adam(learning_rate, beta)
 
     # Build and compile the discriminator
-    discriminator = build_discriminator(img_shape, depth_shape)
+    discriminator = model.build_discriminator()
     discriminator.summary()
     discriminator.compile(loss='mse',
                           optimizer=optimizer,
                           metrics=['accuracy'])
     # Build the generator
-    generator = build_generator(img_shape, channels_depth)
+    generator = model.build_generator()
     generator.summary()
 
     # Input images and their conditioning images
@@ -212,7 +219,7 @@ def train():
 if __name__ == '__main__':
     args = args_handler()
     print(args)
-    input('aki')
+
     if args.mode == 'train':
         train()
     elif args.mode == 'test':
