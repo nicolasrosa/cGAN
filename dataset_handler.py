@@ -1,12 +1,15 @@
 import os
 import time
 import numpy as np
-
+from keras_preprocessing.image import img_to_array, load_img
+from PIL import Image
+from evaluation import read_text_lines, read_file_data, generate_depth_map
+from tqdm import tqdm
 
 def load_dataset():
     train_images, train_labels = None, None
 
-    if not (os.path.exists('data/kitti_completion_train.txt')):  # and os.path.exists('kitti_completion_test(2).txt')):
+    if not (os.path.exists('data/kitti_completion_train.txt') and os.path.exists('data/eigen_test_kitti_depth_files') and os.path.exists('data/eigen_test_files')):  # and os.path.exists('kitti_completion_test(2).txt')):
         timer1 = -time.time()
 
         bad_words = ['image_03',
@@ -96,11 +99,6 @@ def load_dataset():
                 if not any(bad_word in line for bad_word in bad_words):
                     newfile.write(line)
 
-        # with open('kitti_completion_test.txt') as oldfile,open('kitti_completion_test(2).txt','w') as newfile:
-        #     for line in oldfile:
-        #         if not any(bad_word in line for bad_word in bad_words):
-        #             newfile.write(line)
-
         timer1 += time.time()
 
     else:
@@ -134,26 +132,73 @@ def load_dataset():
                 filename='/home/nicolas/MEGA/workspace/cGAN/data/kitti_completion_train.txt',
                 dataset_path='/media/nicolas/nicolas_seagate/datasets/kitti/')
 
-            # image_validation,depth_validation = read_text_file(
-            #     filename='/media/olorin/Documentos/raul/SIDE/kitti_completion_test(2).txt',
-            #     dataset_path='/media/olorin/Documentos/datasets/kitti/')
+            image_kitti_depth, gt_kitti_depth = read_text_file(
+                filename='/home/nicolas/MEGA/workspace/cGAN/data/eigen_test_kitti_depth_files.txt',
+                dataset_path='/media/olorin/Documentos/datasets/kitti/')
+
+            image_eigen,gt_eigen = read_text_file(
+                filename='/home/nicolas/MEGA/workspace/cGAN/data/eigen_test_files.txt',
+                dataset_path='/media/olorin/Documentos/datasets/kitti/raw_data')
 
             image = sorted(image_filenames)
             depth = sorted(depth_filenames)
-            # image_val = sorted(image_validation)
-            # depth_val = sorted(depth_validation)
 
             train_images = image
             train_labels = depth
-            # test_images = image_val
-            # test_labels = depth_val
+            test_images_kitti_depth = image_kitti_depth
+            test_labels_kitti_depth = gt_kitti_depth
+            test_images_eigen = image_eigen
+            test_labels_eigen = gt_eigen
 
-            print(len(image))
-            print(len(depth))
+            print(len(train_images))
+            print(len(train_labels))
+            print(len(test_images_kitti_depth))
+            print(len(test_labels_kitti_depth))
+            print(len(test_images_eigen))
+            print(len(test_labels_eigen))
 
             timer1 += time.time()
 
         except OSError:
             raise SystemExit
 
-    return train_images, train_labels
+    return train_images, train_labels, test_images_kitti_depth, test_labels_kitti_depth, test_images_eigen, test_labels_eigen
+
+def load_and_scale_image(filepath):
+        image_input = img_to_array(load_img(filepath, target_size=(256, 256), interpolation='lanczos'))
+        image_input = image_input.astype(np.float32)
+        image_input = np.expand_dims(image_input, axis=0)
+        return (image_input / 127.5) - 1
+
+def load_and_scale_depth(filepath):
+        image_input = Image.open(filepath)
+        image_input = image_input.resize((256, 256), Image.LANCZOS)
+        image_input = np.expand_dims(image_input, axis=-1).astype(np.uint16) / 256.0
+        image_input = image_input.astype(np.float32)
+        image_input = np.expand_dims(image_input, axis=0)
+        return (image_input / 42.5) - 1
+
+def generate_depth_maps_eigen_split():
+    gt_path = '/media/olorin/Documentos/datasets/kitti/raw_data/'
+    file_path = 'data/eigen_test_files.txt'
+
+    num_test_images = 697
+
+    test_files = read_text_lines(file_path)
+    gt_files, gt_calib, im_sizes, im_files, cams = read_file_data(test_files, gt_path)
+
+    gt_depths = []
+    print('\n[Metrics] Generating depth maps...')
+
+    for t_id in tqdm(range(num_test_images)):
+        camera_id = cams[t_id]  # 2 is left, 3 is right
+        gt_depth = generate_depth_map(gt_calib[t_id], gt_files[t_id], im_sizes[t_id], camera_id, False, False)
+
+        gt_depths.append(gt_depth.astype(np.float32))
+
+
+    return gt_depths
+
+def load_and_scale_depth_test(filepath):
+    gt_depths = img_to_array(load_img(filepath,target_size=(375,1242),interpolation='lanczos')) / 256.0
+    return gt_depths
