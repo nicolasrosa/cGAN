@@ -3,10 +3,10 @@ import time
 import numpy as np
 
 
-def load_dataset():
+def load_dataset(dataset_name):
     train_images, train_labels = None, None
 
-    if not (os.path.exists('data/kitti_completion_train.txt')):  # and os.path.exists('kitti_completion_test(2).txt')):
+    if not (os.path.exists('data/{}_train.txt'.format(dataset_name))):  # and os.path.exists('kitti_guidenet_test(2).txt')):
         timer1 = -time.time()
 
         bad_words = ['image_03',
@@ -91,15 +91,10 @@ def load_dataset():
                      '2011_09_28_drive_0220_sync',
                      '2011_09_28_drive_0222_sync']
 
-        with open('kitti_completion_train.txt') as oldfile, open('kitti_completion_train(2).txt', 'w') as newfile:
+        with open('{}_train.txt'.format(dataset_name)) as oldfile, open('{}_train(2).txt'.format(dataset_name), 'w') as newfile:
             for line in oldfile:
                 if not any(bad_word in line for bad_word in bad_words):
                     newfile.write(line)
-
-        # with open('kitti_completion_test.txt') as oldfile,open('kitti_completion_test(2).txt','w') as newfile:
-        #     for line in oldfile:
-        #         if not any(bad_word in line for bad_word in bad_words):
-        #             newfile.write(line)
 
         timer1 += time.time()
 
@@ -131,12 +126,8 @@ def load_dataset():
                 return image_filenames, depth_filenames
 
             image_filenames, depth_filenames = read_text_file(
-                filename='/home/nicolas/MEGA/workspace/cGAN/data/kitti_completion_train.txt',
+                filename='/home/nicolas/MEGA/workspace/cGAN/data/{}_train.txt'.format(dataset_name),
                 dataset_path='/media/nicolas/nicolas_seagate/datasets/kitti/')
-
-            # image_validation,depth_validation = read_text_file(
-            #     filename='/media/olorin/Documentos/raul/SIDE/kitti_completion_test(2).txt',
-            #     dataset_path='/media/olorin/Documentos/datasets/kitti/')
 
             image = sorted(image_filenames)
             depth = sorted(depth_filenames)

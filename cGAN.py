@@ -3,13 +3,14 @@
 # ========== #
 from __future__ import print_function, division
 
-import argparse
-import datetime
 import os
 
+import argparse
+import imageio
 import matplotlib.pyplot as plt
 import numpy as np
 import tensorflow as tf
+import time
 from PIL import Image
 from keras.backend.tensorflow_backend import set_session
 from keras_preprocessing.image import img_to_array, load_img
@@ -24,23 +25,30 @@ from model import cGAN
 os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 
 config = tf.ConfigProto()
-config.gpu_options.allow_growth = True  # dynamically grow the memory used on the GPU
-config.log_device_placement = True  # to log device placement (on which device the operation ran)
+config.gpu_options.allow_growth = True  # Dynamically grow the memory used on the GPU
+config.log_device_placement = True  # To log device placement (on which device the operation ran)
 
 sess = tf.Session(config=config)
-set_session(sess)  # set this TensorFlow session as the default
+set_session(sess)  # Set this TensorFlow session as the default
 
 tf.logging.set_verbosity(tf.logging.ERROR)  # TODO: comment this line
 
+# TODO: Mover
+# Plot
 plt.ion()
-
+titles = ['Original', 'Prediction (Translated)', 'GT']
+fig, axs = plt.subplots(1, 2)
+# axs[0].set_title(titles[0])
+axs[0].set_title(titles[1])
+axs[1].set_title(titles[2])
 
 # ========== #
 #  Functions #
 # ========== #
 def args_handler():
     parser = argparse.ArgumentParser()
-    parser.add_argument("-m", "--mode", type=str, help="Chooses program mode.")
+    parser.add_argument("-m", "--mode", type=str, help="Chooses program mode.", required=True)
+    parser.add_argument("-d", "--dataset_name", type=str, help="Chooses dataset.", required=True)
 
     return parser.parse_args()
 
@@ -61,11 +69,12 @@ def train():
     learning_rate = 0.0002
     beta = 0.5
     sample_interval = 1
+    # max_depth = 85.0
 
     # --------
     # Dataset
     # --------
-    train_images, train_labels = load_dataset()
+    train_images, train_labels = load_dataset(args.dataset_name)
 
     # -------------------------
     # Construct Computational
@@ -104,7 +113,7 @@ def train():
                      loss_weights=[1, 100],
                      optimizer=optimizer)
 
-    start_time = datetime.datetime.now()
+    start_time = time.time()
 
     # Calculate output shape of D (PatchGAN)
     patch = int(img_rows / 2 ** 4)
@@ -117,7 +126,6 @@ def train():
 
     def sample_images():
         # os.makedirs('images/%s' % dataset_name, exist_ok=True)
-        r, c = 1, 2
 
         # imgs_A, imgs_B = data_loader.load_data(batch_size=3, is_testing=True)
         imgs_B = load_and_scale_image(train_images[0])
@@ -127,22 +135,20 @@ def train():
         gen_imgs = np.concatenate([fake_A, imgs_A])
 
         # Rescale images 0 - 1
-        gen_imgs = 0.5 * gen_imgs + 0.5
+        # gen_imgs = 0.5 * gen_imgs + 0.5
 
-        titles = ['Original', 'Prediction (Translated)', 'GT']
-        fig, axs = plt.subplots(r, c)
+        cax0 = axs[0].imshow(np.squeeze(gen_imgs[0], axis=2))
+        # fig.colorbar(cax0, ax=axs[0])
 
-        cax0 = axs[0].imshow(np.squeeze(gen_imgs[0], axis=2) * 85.0)
-        fig.colorbar(cax0, ax=axs[0])
-        axs[0].set_title(titles[1])
+        cax1 = axs[1].imshow(np.squeeze(gen_imgs[1], axis=2))
+        # fig.colorbar(cax1, ax=axs[1])
 
-        cax1 = axs[1].imshow(np.squeeze(gen_imgs[1], axis=2) * 85.0)
-        fig.colorbar(cax1, ax=axs[1])
-        axs[1].set_title(titles[2])
+        # fig.colorbar(cax1, ax=axs[1])
 
-        plt.show()
-        plt.pause(60.0)
-        plt.close('all')
+        # plt.show()
+        plt.draw()
+        plt.pause(0.0001)
+        # plt.close('all')
 
     def load_and_scale_image(filepath):
         image_input = img_to_array(load_img(filepath, target_size=(img_rows, img_cols), interpolation='lanczos'))
@@ -150,13 +156,17 @@ def train():
         image_input = np.expand_dims(image_input, axis=0)
         return (image_input / 127.5) - 1
 
-    def load_and_scale_depth(filepath):
+    def load_and_scale_depth(filepath):  # FIXME: Scale Depth?
         image_input = Image.open(filepath)
         image_input = image_input.resize((img_cols, img_rows), Image.LANCZOS)
-        image_input = np.expand_dims(image_input, axis=-1).astype(np.uint16) / 256.0
-        image_input = image_input.astype(np.float32)
+        image_input = np.expand_dims(image_input, axis=-1) / 256.0  # TODO: Nem todos datasets serão 256.0
+        image_input = image_input.astype(np.float32)  # float64 -> float32
         image_input = np.expand_dims(image_input, axis=0)
-        return (image_input / 42.5) - 1
+        return image_input
+        # return (image_input / 42.5) - 1
+
+    def load_depth_image(filename, div=256.0): # TODO: Nem todos datasets serão 256.0
+        return imageio.imread(filename).astype('float32') / div
 
     numSamples = len(train_images)
 
@@ -173,6 +183,7 @@ def train():
 
             imgs_B = np.concatenate(list(map(load_and_scale_image, train_images[batch_start:limit])), 0)
             imgs_A = np.concatenate(list(map(load_and_scale_depth, train_labels[batch_start:limit])), 0)
+            # imgs_A = np.concatenate(list(map(load_depth_image, train_labels[batch_start:limit])), 0)
 
             # print(imgs_A.shape)
             # print(imgs_B.shape)
@@ -199,9 +210,12 @@ def train():
             # Train the generators
             g_loss = combined.train_on_batch([imgs_A, imgs_B], [valid, imgs_A])
 
-            elapsed_time = datetime.datetime.now() - start_time
+            elapsed_time = time.time() - start_time
 
-            # sample_images()
+            # timer1 = -time.time()
+            sample_images()
+            # timer1 += time.time()
+            # print(timer1)
 
         # If at save interval => save generated image samples
         if epoch % sample_interval == 0:
