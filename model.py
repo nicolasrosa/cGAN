@@ -53,7 +53,8 @@ class cGAN:
 
         u7 = tf.keras.layers.UpSampling2D(size=2)(u6)
 
-        output_img = tf.keras.layers.Conv2D(self.depth_shape[2], kernel_size=4, strides=1, padding='same', activation='linear')(u7) # TODO: 'tanh' ou 'linear'?
+        output_img = tf.keras.layers.Conv2D(self.depth_shape[2], kernel_size=4, strides=1, padding='same',
+                                            activation='linear')(u7)  # TODO: 'tanh' ou 'linear'?
 
         return tf.keras.Model(d0, output_img)
 

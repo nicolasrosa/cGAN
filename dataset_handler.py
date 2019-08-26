@@ -1,15 +1,17 @@
 import os
-
-import numpy as np
 import time
-from PIL import Image
+
+import cv2
+import numpy as np
 from keras_preprocessing.image import img_to_array, load_img
 
 
 def load_dataset(dataset_name):
     train_images, train_labels = None, None
 
-    if not (os.path.exists('data/{}_train.txt'.format(dataset_name))):  # and os.path.exists('kitti_guidenet_test(2).txt')):
+    if not (
+            os.path.exists(
+                'data/{}_train.txt'.format(dataset_name))):  # and os.path.exists('kitti_guidenet_test(2).txt')):
         timer1 = -time.time()
 
         bad_words = ['image_03',
@@ -94,7 +96,8 @@ def load_dataset(dataset_name):
                      '2011_09_28_drive_0220_sync',
                      '2011_09_28_drive_0222_sync']
 
-        with open('{}_train.txt'.format(dataset_name)) as oldfile, open('{}_train(2).txt'.format(dataset_name), 'w') as newfile:
+        with open('{}_train.txt'.format(dataset_name)) as oldfile, open('{}_train(2).txt'.format(dataset_name),
+                                                                        'w') as newfile:
             for line in oldfile:
                 if not any(bad_word in line for bad_word in bad_words):
                     newfile.write(line)
@@ -152,17 +155,25 @@ def load_dataset(dataset_name):
 
     return train_images, train_labels
 
+
 def load_and_scale_image(filepath):
     image_input = img_to_array(load_img(filepath, target_size=(256, 256), interpolation='lanczos'))
     image_input = image_input.astype(np.float32)
     image_input = np.expand_dims(image_input, axis=0)
     return (image_input / 127.5) - 1
 
-def load_and_scale_depth(filepath):  # FIXME: Scale Depth?
-    image_input = Image.open(filepath)
-    image_input = image_input.resize((256, 256), Image.LANCZOS)
+
+def load_and_scale_depth(filepath):
+    import imageio
+    image_input = imageio.imread(filepath)
+    image_input = cv2.resize(image_input, (256,256), interpolation=cv2.INTER_AREA)
     image_input = np.expand_dims(image_input, axis=-1) / 256.0  # TODO: Nem todos datasets serão 256.0
     image_input = image_input.astype(np.float32)  # float64 -> float32
     image_input = np.expand_dims(image_input, axis=0)
+
+    # print(image_input.shape, image_input.dtype)
+    # print(np.min(image_input), np.max(image_input))
+    # input('aki')
+
     return image_input
     # return (image_input / 42.5) - 1
