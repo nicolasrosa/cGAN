@@ -25,11 +25,11 @@ from model import cGAN
 os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 
 config = tf.ConfigProto()
-config.gpu_options.allow_growth = True  # Dynamically grow the memory used on the GPU
-config.log_device_placement = True  # To log device placement (on which device the operation ran)
+config.gpu_options.allow_growth = True  # dynamically grow the memory used on the GPU
+config.log_device_placement = True  # to log device placement (on which device the operation ran)
 
 sess = tf.Session(config=config)
-set_session(sess)  # Set this TensorFlow session as the default
+set_session(sess)  # set this TensorFlow session as the default
 
 tf.logging.set_verbosity(tf.logging.ERROR)  # TODO: comment this line
 
@@ -50,12 +50,20 @@ def args_handler():
     parser.add_argument("-m", "--mode", type=str, help="Chooses program mode.", required=True)
     parser.add_argument("-d", "--dataset_name", type=str, help="Chooses dataset.", required=True)
 
+    # TODO: Terminar de arrumar
+    parser.add_argument("-e", "--epoch", type=int, help="Define train epochs number.", default=50)
+    parser.add_argument("-b", "--batch", type=int, help="Define batch size.", default=4)
+    parser.add_argument("-p", "--plot", type=int, help="Define plot interval (epochs number).", default=1)
+    parser.add_argument("-t", "--test", type=str, help="Choose kitti depth or eigen to test (kitti or eigen).", default="kitti")
+    parser.add_argument("--max_depth", type=float, help="Set depth max value.", default=85.0)
+    parser.add_argument("-a", "--mask", type=str, help="Set depth mask (50, 80 or None).", default="None")
+
     return parser.parse_args()
 
 
-# ===== #
-#  Main #
-# ===== #
+# ====== #
+#  Train #
+# ====== #
 def train():
     # Defines Input shape
     img_rows, img_cols, channels, channels_depth = 256, 256, 3, 1
@@ -64,8 +72,11 @@ def train():
     depth_shape = (img_rows, img_cols, channels_depth)
 
     # Sets Training Variables
-    epochs = 300
-    batch_size = 4
+    epochs = args.epoch
+    batch_size = args.batch
+    sample_interval = args.plot
+    max_depth = args.max_depth
+    # TODO: criar args
     learning_rate = 0.0002
     beta = 0.5
     sample_interval = 1
@@ -183,7 +194,6 @@ def train():
 
             imgs_B = np.concatenate(list(map(load_and_scale_image, train_images[batch_start:limit])), 0)
             imgs_A = np.concatenate(list(map(load_and_scale_depth, train_labels[batch_start:limit])), 0)
-            # imgs_A = np.concatenate(list(map(load_depth_image, train_labels[batch_start:limit])), 0)
 
             # print(imgs_A.shape)
             # print(imgs_B.shape)
@@ -217,26 +227,212 @@ def train():
             # timer1 += time.time()
             # print(timer1)
 
-        # If at save interval => save generated image samples
-        if epoch % sample_interval == 0:
-            generator.save_weights('weights_generator_bce.h5')
-            discriminator.save_weights('weights_discriminator_bce.h5')
-            combined.save_weights('weights_combined_bce.h5')
-
         # Plot the progress
         print("[Epoch %d/%d] [D loss: %f, acc: %3d%%] [G loss: %f] time: %s" % (epoch, epochs,
                                                                                 d_loss[0], 100 * d_loss[1],
                                                                                 g_loss[0],
                                                                                 elapsed_time))
 
+        # If at save interval => save generated image samples
+        if epoch % sample_interval == 0:
+            generator.save_weights('weights_generator_bce.h5')
+            discriminator.save_weights('weights_discriminator_bce.h5')
+            combined.save_weights('weights_combined_bce.h5')
 
+    print("Training completed.")
+
+# ===== #
+#  Test #
+# ===== #
+def test(args):
+    def imageLoader(image_filenames):
+
+        numSamples = len(image_filenames)
+
+        while True:
+
+            batch_start = 0
+            batch_end = 1
+
+            while batch_start < numSamples:
+
+                limit = min(batch_end,numSamples)
+
+                X_batch = np.concatenate(list(map(load_and_scale_image,image_filenames[batch_start:limit])),0)
+
+                yield (X_batch)
+
+                if ((limit + 1) <= numSamples):
+                    batch_start += 1
+                    batch_end += 1
+
+                else:
+                    del X_batch
+                    batch_start = 0
+                    batch_end = 1
+
+    _, _, test_images_kitti_depth, test_labels_kitti_depth, test_images_eigen, test_labels_eigen = load_dataset()
+
+    # --------
+    # Model
+    # --------
+    model = build_generator()
+    model.summary()
+
+    print('Testing...')
+
+    # -----------------------
+    # Load generator weights
+    # -----------------------
+    # model.load_weights('weights_generator_bce.h5')
+
+    if args.test == "kitti":
+        y_pred = model.predict_generator(imageLoader(test_images_kitti_depth),steps=len(test_images_kitti_depth))
+    elif args.test == "eigen":
+        y_pred = model.predict_generator(imageLoader(test_images_eigen),steps=len(test_images_eigen))
+    else:
+        raise SystemError
+
+    # Rescale depth maps 0 - 1
+    y_pred = 0.5 * y_pred + 0.5
+
+    y_pred = y_pred * args.max
+
+    y_pred = y_pred[:,0,:,:,0]
+
+    y_pred = np.expand_dims(y_pred,-1)
+
+    print(y_pred.shape)
+    print(y_pred.max())
+
+    for i in range(5):
+        plt.subplot(1,5,i + 1)
+        plt.imshow(y_pred[i,:,:,0])
+        plt.colorbar()
+    plt.show()
+
+    y_pred_final = []
+    for i in range(len(y_pred)):
+        y_pred_final.append(cv2.resize(y_pred[i,:,:,0],(1242,375),interpolation=cv2.INTER_LINEAR))
+
+    y_pred_final = np.expand_dims(y_pred_final,-1)
+
+    print(y_pred_final.shape)
+    print(np.array(y_pred_final).max())
+
+    for i in range(5):
+        plt.subplot(1,5,i + 1)
+        plt.imshow(y_pred_final[i,:,:,0])
+        plt.colorbar()
+    plt.show()
+
+    imask_50 = np.where(y_pred_final < 50.0,np.ones_like(y_pred_final),np.zeros_like(y_pred_final))
+    imask_80 = np.where(y_pred_final < 80.0,np.ones_like(y_pred_final),np.zeros_like(y_pred_final))
+    pred_50 = np.multiply(y_pred_final,imask_50)
+    pred_80 = np.multiply(y_pred_final,imask_80)
+
+    for i in range(5):
+        plt.subplot(1,5,i + 1)
+        plt.imshow(pred_50[i,:,:,0])
+        plt.colorbar()
+    plt.show()
+
+    for i in range(5):
+        plt.subplot(1,5,i + 1)
+        plt.imshow(pred_80[i,:,:,0])
+        plt.colorbar()
+    plt.show()
+
+    print(np.array(pred_50).max())
+    print(np.array(pred_80).max())
+
+    depth_batch = []
+    if args.test == "kitti":
+        for i in test_labels_kitti_depth:
+            depth = load_and_scale_depth_test(i)
+            depth_batch.append(depth)
+    elif args.test == "eigen":
+        gt_depths = generate_depth_maps_eigen_split()
+        depth_batch = []
+        for i in gt_depths:
+            depth = cv2.resize(i,(1242,375),interpolation=cv2.INTER_LINEAR)
+            depth_batch.append(depth)
+    else:
+        raise SystemError
+
+    depth_batch = np.expand_dims(depth_batch,-1)
+    depth_batch = depth_batch.astype(np.float32)
+
+    print(depth_batch.shape)
+    print(depth_batch.max())
+
+    for i in range(5):
+        plt.subplot(1,5,i + 1)
+        plt.imshow(depth_batch[i,:,:,0])
+        plt.colorbar()
+    plt.show()
+
+    num_test_images = len(y_pred_final)
+
+    rms = np.zeros(num_test_images,np.float32)
+    log_rms = np.zeros(num_test_images,np.float32)
+    abs_rel = np.zeros(num_test_images,np.float32)
+    sq_rel = np.zeros(num_test_images,np.float32)
+    a1 = np.zeros(num_test_images,np.float32)
+    a2 = np.zeros(num_test_images,np.float32)
+    a3 = np.zeros(num_test_images,np.float32)
+
+    print('Computing metrics...')
+    for i in tqdm(range(num_test_images)):
+        try:
+            if args.mask == "50":
+                pred_depth = pred_50[i,:,:,0]
+            elif args.mask == "80":
+                pred_depth = pred_80[i,:,:,0]
+            elif args.mask == "None":
+                pred_depth = y_pred_final[i,:,:,0]
+            else:
+                raise SystemError
+
+            gt_depth = depth_batch[i,:,:,0]
+
+            pred_depth[pred_depth < (10.0 ** -3.0)] = 10.0 ** -3.0
+            pred_depth[pred_depth > (80.0)] = 80.0
+
+            mask = gt_depth > 0
+
+            abs_rel[i],sq_rel[i],rms[i],log_rms[i],a1[i],a2[i],a3[i] = compute_errors(gt_depth[mask],pred_depth[mask])
+
+        except IndexError:
+            break
+
+    print("abs_rel:")
+    print(abs_rel.mean())
+    print("sq_rel:")
+    print(sq_rel.mean())
+    print("rms_rel:")
+    print(rms.mean())
+    print("log_rms:")
+    print(log_rms.mean())
+    print("a1:")
+    print(a1.mean())
+    print("a2:")
+    print(a2.mean())
+    print("a3:")
+    print(a3.mean())
+
+    print("Testing completed.")
+
+
+# ===== #
+#  Main #
+# ===== #
 if __name__ == '__main__':
     args = args_handler()
-    print(args)
 
     if args.mode == 'train':
         train()
     elif args.mode == 'test':
-        print("Implementar!")
+        test()
     else:
         raise SystemError
