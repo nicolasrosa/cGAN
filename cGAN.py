@@ -6,17 +6,14 @@ from __future__ import print_function, division
 import os
 
 import argparse
-import imageio
 import matplotlib.pyplot as plt
 import numpy as np
 import tensorflow as tf
 import time
-from PIL import Image
 from keras.backend.tensorflow_backend import set_session
-from keras_preprocessing.image import img_to_array, load_img
 from tqdm import tqdm
 
-from dataset_handler import load_dataset
+from dataset_handler import load_dataset, load_and_scale_image, load_and_scale_depth
 from model import cGAN
 
 # ================= #
@@ -160,24 +157,6 @@ def train():
         plt.draw()
         plt.pause(0.0001)
         # plt.close('all')
-
-    def load_and_scale_image(filepath):
-        image_input = img_to_array(load_img(filepath, target_size=(img_rows, img_cols), interpolation='lanczos'))
-        image_input = image_input.astype(np.float32)
-        image_input = np.expand_dims(image_input, axis=0)
-        return (image_input / 127.5) - 1
-
-    def load_and_scale_depth(filepath):  # FIXME: Scale Depth?
-        image_input = Image.open(filepath)
-        image_input = image_input.resize((img_cols, img_rows), Image.LANCZOS)
-        image_input = np.expand_dims(image_input, axis=-1) / 256.0  # TODO: Nem todos datasets serão 256.0
-        image_input = image_input.astype(np.float32)  # float64 -> float32
-        image_input = np.expand_dims(image_input, axis=0)
-        return image_input
-        # return (image_input / 42.5) - 1
-
-    def load_depth_image(filename, div=256.0): # TODO: Nem todos datasets serão 256.0
-        return imageio.imread(filename).astype('float32') / div
 
     numSamples = len(train_images)
 

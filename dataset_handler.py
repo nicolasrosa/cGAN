@@ -1,6 +1,9 @@
 import os
-import time
+
 import numpy as np
+import time
+from PIL import Image
+from keras_preprocessing.image import img_to_array, load_img
 
 
 def load_dataset(dataset_name):
@@ -148,3 +151,18 @@ def load_dataset(dataset_name):
             raise SystemExit
 
     return train_images, train_labels
+
+def load_and_scale_image(filepath):
+    image_input = img_to_array(load_img(filepath, target_size=(256, 256), interpolation='lanczos'))
+    image_input = image_input.astype(np.float32)
+    image_input = np.expand_dims(image_input, axis=0)
+    return (image_input / 127.5) - 1
+
+def load_and_scale_depth(filepath):  # FIXME: Scale Depth?
+    image_input = Image.open(filepath)
+    image_input = image_input.resize((256, 256), Image.LANCZOS)
+    image_input = np.expand_dims(image_input, axis=-1) / 256.0  # TODO: Nem todos datasets serão 256.0
+    image_input = image_input.astype(np.float32)  # float64 -> float32
+    image_input = np.expand_dims(image_input, axis=0)
+    return image_input
+    # return (image_input / 42.5) - 1
