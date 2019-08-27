@@ -2,6 +2,7 @@ import os
 import time
 
 import cv2
+import imageio
 import numpy as np
 from keras_preprocessing.image import img_to_array, load_img
 
@@ -157,14 +158,15 @@ def load_dataset(dataset_name):
 
 
 def load_and_scale_image(filepath):
-    image_input = img_to_array(load_img(filepath, target_size=(256, 256), interpolation='lanczos'))
-    image_input = image_input.astype(np.float32)
+    image_input = imageio.imread(filepath)
+    image_input = cv2.resize(image_input, (256,256), interpolation=cv2.INTER_AREA)
     image_input = np.expand_dims(image_input, axis=0)
+    image_input = image_input.astype(np.float32)
+
     return (image_input / 127.5) - 1
 
 
 def load_and_scale_depth(filepath):
-    import imageio
     image_input = imageio.imread(filepath)
     image_input = cv2.resize(image_input, (256,256), interpolation=cv2.INTER_AREA)
     image_input = np.expand_dims(image_input, axis=-1) / 256.0  # TODO: Nem todos datasets serão 256.0

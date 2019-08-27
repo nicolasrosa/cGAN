@@ -6,6 +6,7 @@ from __future__ import print_function, division
 import argparse
 import os
 import time
+from datetime import datetime
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -29,6 +30,8 @@ sess = tf.Session(config=config)
 set_session(sess)  # set this TensorFlow session as the default
 
 tf.logging.set_verbosity(tf.logging.ERROR)  # TODO: comment this line
+
+datetime_var = datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
 
 # TODO: Mover
 # Plot
@@ -89,6 +92,11 @@ def train():
     beta = args.beta
     max_depth = args.max_depth
     sample_interval = args.plot
+
+    # Creates output directory
+    model_folder = "output/{}/{}/".format(dataset_name, datetime_var)
+    os.makedirs(model_folder)
+    print("\nDirectory '", model_folder, "' created.", sep='')
 
     # --------
     # Dataset
@@ -221,18 +229,18 @@ def train():
             # print(timer1)
 
         # Plot the progress
-        print("[Epoch %d/%d] [D loss: %f, acc: %3d%%] [G loss: %f] time: %s" % (epoch, epochs,
+        print("[Epoch %d/%d] [D loss: %f, acc: %3d%%] [G loss: %f] time: %s" % (epoch+1, epochs,
                                                                                 d_loss[0], 100 * d_loss[1],
                                                                                 g_loss[0],
                                                                                 elapsed_time))
 
         # If at save interval => save generated image samples
         if epoch % sample_interval == 0:
-            generator.save_weights('weights_generator_bce.h5')
-            discriminator.save_weights('weights_discriminator_bce.h5')
-            combined.save_weights('weights_combined_bce.h5')
+            generator.save_weights(model_folder + 'weights_generator_bce.h5')
+            discriminator.save_weights(model_folder + 'weights_discriminator_bce.h5')
+            combined.save_weights(model_folder + 'weights_combined_bce.h5')
 
-    print("Training completed.")
+    print("\nTraining completed.")
 
 
 # ===== #
