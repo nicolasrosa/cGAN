@@ -1,0 +1,14 @@
+# Exclude Folders
+.idea/*
+output/
+
+# Exceptions
+
+
+# Exclude Extensions
+*/.DS_Store
+*.pyc
+*.DS_Store
+
+# Exclude Files
+
