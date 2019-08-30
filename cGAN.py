@@ -39,12 +39,11 @@ plt.ion()
 titles = ['Original', 'Prediction (Translated)', 'GT']
 fig, axs = plt.subplots(1, 2)
 
-cax0 = axs[0].imshow(np.zeros((256,256)))
+cax0 = axs[0].imshow(np.zeros((256, 256)))
 cbar0 = fig.colorbar(cax0, ax=axs[0], fraction=0.045)
-# fraction=0.046, pad=0.04
 axs[0].set_title(titles[1])
 
-cax1 = axs[1].imshow(np.zeros((256,256)))
+cax1 = axs[1].imshow(np.zeros((256, 256)))
 cbar1 = fig.colorbar(cax1, ax=axs[1], fraction=0.045)
 axs[1].set_title(titles[2])
 fig.tight_layout(pad=0.2, w_pad=2.5, h_pad=None)  # Fix Subplots Spacing
@@ -66,6 +65,7 @@ def args_handler():
     parser.add_argument("--beta", type=str, help="Define Adam's beta.", default=0.5)
 
     parser.add_argument("--max_depth", type=float, help="Set depth max value.", default=85.0)
+    parser.add_argument("--single_image", action='store_true', help="Train model on a single image.", default=False)
 
     parser.add_argument("-p", "--plot", type=int, help="Define plot interval (epochs number).", default=1)
     parser.add_argument("-t", "--test", type=str, help="Choose kitti depth or eigen to test (kitti or eigen).",
@@ -102,6 +102,13 @@ def train():
     # Dataset
     # --------
     train_images, train_labels = load_dataset(dataset_name)
+    numSamples = len(train_images)
+
+    if args.single_image:
+        train_images = [train_images[0]]
+        train_labels = [train_labels[0]]
+        numSamples=0
+        batch_size=1
 
     # -------------------------
     # Construct Computational
@@ -159,7 +166,6 @@ def train():
         cbar.set_ticks(cbar_ticks)
         cbar.draw_all()
 
-
     def sample_images():
         # os.makedirs('images/%s' % dataset_name, exist_ok=True)
 
@@ -168,24 +174,25 @@ def train():
         fake_A = generator.predict(imgs_B)
 
         gen_imgs = np.concatenate([fake_A, imgs_A])
+        gen_imgs[0] = np.exp(gen_imgs[0])-1
+        gen_imgs[1] = np.exp(gen_imgs[1])-1
 
-        cax0.set_data(gen_imgs[0,:,:,0])
-        update_colorbar(cbar0, gen_imgs[0,:,:,0])
+        cax0.set_data(gen_imgs[0, :, :, 0])
+        update_colorbar(cbar0, gen_imgs[0, :, :, 0])
 
-        cax1.set_data(gen_imgs[1,:,:,0])
-        update_colorbar(cbar1, gen_imgs[1,:,:,0])
+        cax1.set_data(gen_imgs[1, :, :, 0])
+        update_colorbar(cbar1, gen_imgs[1, :, :, 0])
 
         # plt.show()
         plt.draw()
         plt.pause(0.0001)
         # plt.close('all')
 
-    numSamples = len(train_images)
-
     for epoch in range(epochs):
         batch_start = 0
         batch_end = batch_size
-        for batch in tqdm(range((len(train_images) // batch_size) + 1)):
+
+        for _ in tqdm(range((numSamples // batch_size) + 1)):
 
             limit = batch_end
 
@@ -193,8 +200,12 @@ def train():
                 limit = numSamples
                 batch_start = numSamples - batch_size
 
-            imgs_B = np.concatenate(list(map(load_and_scale_image, train_images[batch_start:limit])), 0)
-            imgs_A = np.concatenate(list(map(load_and_scale_depth, train_labels[batch_start:limit])), 0)
+            try:
+                imgs_B = np.concatenate(list(map(load_and_scale_image, train_images[batch_start:limit])), 0)
+                imgs_A = np.concatenate(list(map(load_and_scale_depth, train_labels[batch_start:limit])), 0)
+            except ValueError:  # Single Image Workaround
+                imgs_B = load_and_scale_image(train_images[0])
+                imgs_A = load_and_scale_depth(train_labels[0])
 
             # print(imgs_A.shape)
             # print(imgs_B.shape)
@@ -229,7 +240,7 @@ def train():
             # print(timer1)
 
         # Plot the progress
-        print("[Epoch %d/%d] [D loss: %f, acc: %3d%%] [G loss: %f] time: %s" % (epoch+1, epochs,
+        print("[Epoch %d/%d] [D loss: %f, acc: %3d%%] [G loss: %f] time: %s" % (epoch + 1, epochs,
                                                                                 d_loss[0], 100 * d_loss[1],
                                                                                 g_loss[0],
                                                                                 elapsed_time))
@@ -247,7 +258,7 @@ def train():
 #  Test #
 # ===== #
 def test(args):
-    def imageLoader(image_filenames):
+    def image_loader(image_filenames):
 
         numSamples = len(image_filenames)
 
@@ -289,9 +300,9 @@ def test(args):
     # model.load_weights('weights_generator_bce.h5')
 
     if args.test == "kitti":
-        y_pred = model.predict_generator(imageLoader(test_images_kitti_depth), steps=len(test_images_kitti_depth))
+        y_pred = model.predict_generator(image_loader(test_images_kitti_depth), steps=len(test_images_kitti_depth))
     elif args.test == "eigen":
-        y_pred = model.predict_generator(imageLoader(test_images_eigen), steps=len(test_images_eigen))
+        y_pred = model.predict_generator(image_loader(test_images_eigen), steps=len(test_images_eigen))
     else:
         raise SystemError
 

@@ -159,7 +159,7 @@ def load_dataset(dataset_name):
 
 def load_and_scale_image(filepath):
     image_input = imageio.imread(filepath)
-    image_input = cv2.resize(image_input, (256,256), interpolation=cv2.INTER_AREA)
+    image_input = cv2.resize(image_input, (256, 256), interpolation=cv2.INTER_AREA)
     image_input = np.expand_dims(image_input, axis=0)
     image_input = image_input.astype(np.float32)
 
@@ -168,7 +168,7 @@ def load_and_scale_image(filepath):
 
 def load_and_scale_depth(filepath):
     image_input = imageio.imread(filepath)
-    image_input = cv2.resize(image_input, (256,256), interpolation=cv2.INTER_AREA)
+    image_input = cv2.resize(image_input, (256, 256), interpolation=cv2.INTER_AREA)
     image_input = np.expand_dims(image_input, axis=-1) / 256.0  # TODO: Nem todos datasets serão 256.0
     image_input = image_input.astype(np.float32)  # float64 -> float32
     image_input = np.expand_dims(image_input, axis=0)
@@ -177,5 +177,5 @@ def load_and_scale_depth(filepath):
     # print(np.min(image_input), np.max(image_input))
     # input('aki')
 
-    return image_input
+    return np.log(image_input+1)
     # return (image_input / 42.5) - 1
