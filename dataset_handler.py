@@ -161,7 +161,7 @@ def load_and_scale_image(filepath):
     image_input = imageio.imread(filepath)
     image_input = cv2.resize(image_input, (256, 256), interpolation=cv2.INTER_AREA)
     image_input = np.expand_dims(image_input, axis=0)
-    image_input = image_input.astype(np.float32)
+    # image_input = image_input.astype(np.float32)  # float64 -> float32
 
     return (image_input / 127.5) - 1
 
@@ -170,7 +170,7 @@ def load_and_scale_depth(filepath):
     image_input = imageio.imread(filepath)
     image_input = cv2.resize(image_input, (256, 256), interpolation=cv2.INTER_AREA)
     image_input = np.expand_dims(image_input, axis=-1) / 256.0  # TODO: Nem todos datasets serão 256.0
-    image_input = image_input.astype(np.float32)  # float64 -> float32
+    # image_input = image_input.astype(np.float32)  # float64 -> float32  # This will increase precisions errors from 1e-14 to 1e-4!
     image_input = np.expand_dims(image_input, axis=0)
 
     # print(image_input.shape, image_input.dtype)
