@@ -8,6 +8,7 @@ import os
 import time
 from datetime import datetime
 
+import cv2
 import matplotlib.pyplot as plt
 import numpy as np
 import tensorflow as tf
@@ -16,6 +17,7 @@ from tqdm import tqdm
 
 from dataset_handler import load_dataset, load_and_scale_image, load_and_scale_depth
 from model import cGAN
+from evaluation import compute_errors
 
 # ================= #
 #  Global Variables #
@@ -33,23 +35,6 @@ tf.logging.set_verbosity(tf.logging.ERROR)  # TODO: comment this line
 
 datetime_var = datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
 
-# TODO: Mover
-# Plot
-plt.ion()
-titles = ['Original', 'Prediction (Translated)', 'GT']
-fig, axs = plt.subplots(1, 2)
-
-cax0 = axs[0].imshow(np.zeros((256,256)))
-cbar0 = fig.colorbar(cax0, ax=axs[0], fraction=0.045)
-# fraction=0.046, pad=0.04
-axs[0].set_title(titles[1])
-
-cax1 = axs[1].imshow(np.zeros((256,256)))
-cbar1 = fig.colorbar(cax1, ax=axs[1], fraction=0.045)
-axs[1].set_title(titles[2])
-fig.tight_layout(pad=0.2, w_pad=2.5, h_pad=None)  # Fix Subplots Spacing
-
-
 # ========== #
 #  Functions #
 # ========== #
@@ -66,6 +51,7 @@ def args_handler():
     parser.add_argument("--beta", type=str, help="Define Adam's beta.", default=0.5)
 
     parser.add_argument("--max_depth", type=float, help="Set depth max value.", default=85.0)
+    parser.add_argument("--single_image", action='store_true', help="Train model on a single image.", default=False)
 
     parser.add_argument("-p", "--plot", type=int, help="Define plot interval (epochs number).", default=1)
     parser.add_argument("-t", "--test", type=str, help="Choose kitti depth or eigen to test (kitti or eigen).",
@@ -78,6 +64,20 @@ def args_handler():
 #  Train #
 # ====== #
 def train():
+    # Plot
+    plt.ion()
+    titles = ['Original', 'Prediction (Translated)', 'GT']
+    fig, axs = plt.subplots(1, 2)
+
+    cax0 = axs[0].imshow(np.zeros((256, 256)))
+    cbar0 = fig.colorbar(cax0, ax=axs[0], fraction=0.045)
+    axs[0].set_title(titles[1])
+
+    cax1 = axs[1].imshow(np.zeros((256, 256)))
+    cbar1 = fig.colorbar(cax1, ax=axs[1], fraction=0.045)
+    axs[1].set_title(titles[2])
+    fig.tight_layout(pad=0.2, w_pad=2.5, h_pad=None)  # Fix Subplots Spacing
+
     # Defines Input shape
     img_rows, img_cols, channels, channels_depth = 256, 256, 3, 1
 
@@ -101,7 +101,14 @@ def train():
     # --------
     # Dataset
     # --------
-    train_images, train_labels = load_dataset(dataset_name)
+    train_images, train_labels, _, _ = load_dataset(dataset_name)
+    numSamples = len(train_images)
+
+    if args.single_image:
+        train_images = [train_images[0]]
+        train_labels = [train_labels[0]]
+        numSamples=0
+        batch_size=1
 
     # -------------------------
     # Construct Computational
@@ -159,7 +166,6 @@ def train():
         cbar.set_ticks(cbar_ticks)
         cbar.draw_all()
 
-
     def sample_images():
         # os.makedirs('images/%s' % dataset_name, exist_ok=True)
 
@@ -168,24 +174,25 @@ def train():
         fake_A = generator.predict(imgs_B)
 
         gen_imgs = np.concatenate([fake_A, imgs_A])
+        gen_imgs[0] = np.exp(gen_imgs[0])-1
+        gen_imgs[1] = np.exp(gen_imgs[1])-1
 
-        cax0.set_data(gen_imgs[0,:,:,0])
-        update_colorbar(cbar0, gen_imgs[0,:,:,0])
+        cax0.set_data(gen_imgs[0, :, :, 0])
+        update_colorbar(cbar0, gen_imgs[0, :, :, 0])
 
-        cax1.set_data(gen_imgs[1,:,:,0])
-        update_colorbar(cbar1, gen_imgs[1,:,:,0])
+        cax1.set_data(gen_imgs[1, :, :, 0])
+        update_colorbar(cbar1, gen_imgs[1, :, :, 0])
 
         # plt.show()
         plt.draw()
         plt.pause(0.0001)
         # plt.close('all')
 
-    numSamples = len(train_images)
-
     for epoch in range(epochs):
         batch_start = 0
         batch_end = batch_size
-        for batch in tqdm(range((len(train_images) // batch_size) + 1)):
+
+        for _ in tqdm(range((numSamples // batch_size) + 1)):
 
             limit = batch_end
 
@@ -193,8 +200,12 @@ def train():
                 limit = numSamples
                 batch_start = numSamples - batch_size
 
-            imgs_B = np.concatenate(list(map(load_and_scale_image, train_images[batch_start:limit])), 0)
-            imgs_A = np.concatenate(list(map(load_and_scale_depth, train_labels[batch_start:limit])), 0)
+            try:
+                imgs_B = np.concatenate(list(map(load_and_scale_image, train_images[batch_start:limit])), 0)
+                imgs_A = np.concatenate(list(map(load_and_scale_depth, train_labels[batch_start:limit])), 0)
+            except ValueError:  # Single Image Workaround
+                imgs_B = load_and_scale_image(train_images[0])
+                imgs_A = load_and_scale_depth(train_labels[0])
 
             # print(imgs_A.shape)
             # print(imgs_B.shape)
@@ -229,7 +240,7 @@ def train():
             # print(timer1)
 
         # Plot the progress
-        print("[Epoch %d/%d] [D loss: %f, acc: %3d%%] [G loss: %f] time: %s" % (epoch+1, epochs,
+        print("[Epoch %d/%d] [D loss: %f, acc: %3d%%] [G loss: %f] time: %s" % (epoch + 1, epochs,
                                                                                 d_loss[0], 100 * d_loss[1],
                                                                                 g_loss[0],
                                                                                 elapsed_time))
@@ -246,13 +257,18 @@ def train():
 # ===== #
 #  Test #
 # ===== #
-def test(args):
-    def imageLoader(image_filenames):
+def test():
+    # Defines Input shape
+    img_rows, img_cols, channels, channels_depth = 256, 256, 3, 1
 
+    img_shape = (img_rows, img_cols, channels)
+    depth_shape = (img_rows, img_cols, channels_depth)
+
+
+    def image_loader(image_filenames):
         numSamples = len(image_filenames)
 
         while True:
-
             batch_start = 0
             batch_end = 1
 
@@ -273,85 +289,73 @@ def test(args):
                     batch_start = 0
                     batch_end = 1
 
-    _, _, test_images_kitti_depth, test_labels_kitti_depth, test_images_eigen, test_labels_eigen = load_dataset()
+
+
+    _, _, test_images, test_labels, _, _ = load_dataset(args.dataset_name)
 
     # --------
     # Model
     # --------
-    model = build_generator()
-    model.summary()
+    model = cGAN(img_shape, depth_shape)
+    generator = model.build_generator()
+    generator.summary()
 
-    print('Testing...')
+
 
     # -----------------------
     # Load generator weights
     # -----------------------
-    # model.load_weights('weights_generator_bce.h5')
+    # generator.load_weights('/home/nicolas/MEGA/workspace/cGAN/output/kitti_morphological/2019-09-02_10-29-44/weights_generator_bce.h5')
+    generator.load_weights('/home/nicolas/MEGA/workspace/cGAN/output/weights_generator_linear4.h5')
 
-    if args.test == "kitti":
-        y_pred = model.predict_generator(imageLoader(test_images_kitti_depth), steps=len(test_images_kitti_depth))
-    elif args.test == "eigen":
-        y_pred = model.predict_generator(imageLoader(test_images_eigen), steps=len(test_images_eigen))
-    else:
-        raise SystemError
+    numSamples = len(test_labels)
+    y_pred = []
 
-    # Rescale depth maps 0 - 1
-    y_pred = 0.5 * y_pred + 0.5
+    print('Testing...')
 
-    y_pred = y_pred * args.max
+    numSamples = 10 # TODO: remover
+    for k in tqdm(range(numSamples)):
+        imgs_B = load_and_scale_image(test_images[k])
+        fake_A = generator.predict(imgs_B)
+        # fake_A = 0.5 * fake_A + 0.5
+        # fake_A = fake_A * 85.0
+        y_pred.append(fake_A[0, :, :, 0])
 
-    y_pred = y_pred[:, 0, :, :, 0]
+        plt.figure(1)
+        plt.imshow(fake_A[0, :,: ,0])
+        plt.pause(0.0001)
+        plt.draw()
 
-    y_pred = np.expand_dims(y_pred, -1)
-
-    print(y_pred.shape)
-    print(y_pred.max())
-
-    for i in range(5):
-        plt.subplot(1, 5, i + 1)
-        plt.imshow(y_pred[i, :, :, 0])
-        plt.colorbar()
-    plt.show()
+    # print(y_pred_final[0].shape, y_pred_final[0].max())
 
     y_pred_final = []
-    for i in range(len(y_pred)):
-        # noinspection PyUnresolvedReferences,PyUnresolvedReferences
-        y_pred_final.append(cv2.resize(y_pred[i, :, :, 0], (1242, 375), interpolation=cv2.INTER_LINEAR))
+    for pred in y_pred:
+        pred_resized = cv2.resize(pred, (1242, 375), interpolation=cv2.INTER_LINEAR)
+        y_pred_final.append(pred_resized)
 
-    y_pred_final = np.expand_dims(y_pred_final, -1)
-
-    print(y_pred_final.shape)
-    print(np.array(y_pred_final).max())
-
-    for i in range(5):
-        plt.subplot(1, 5, i + 1)
-        plt.imshow(y_pred_final[i, :, :, 0])
-        plt.colorbar()
-    plt.show()
+    y_pred_final = np.array(y_pred_final)  # list -> np.array
 
     imask_50 = np.where(y_pred_final < 50.0, np.ones_like(y_pred_final), np.zeros_like(y_pred_final))
     imask_80 = np.where(y_pred_final < 80.0, np.ones_like(y_pred_final), np.zeros_like(y_pred_final))
     pred_50 = np.multiply(y_pred_final, imask_50)
     pred_80 = np.multiply(y_pred_final, imask_80)
 
-    for i in range(5):
-        plt.subplot(1, 5, i + 1)
-        plt.imshow(pred_50[i, :, :, 0])
-        plt.colorbar()
-    plt.show()
-
-    for i in range(5):
-        plt.subplot(1, 5, i + 1)
-        plt.imshow(pred_80[i, :, :, 0])
-        plt.colorbar()
-    plt.show()
+    for i in range(numSamples):
+        plt.figure(2)
+        plt.imshow(pred_50[i])
+        plt.figure(3)
+        plt.imshow(pred_80[i])
+        plt.pause(0.0001)
+        plt.draw()
 
     print(np.array(pred_50).max())
     print(np.array(pred_80).max())
 
+    input('Calculate metrics...')
+
     depth_batch = []
     if args.test == "kitti":
-        for i in test_labels_kitti_depth:
+        for i in test_labels:
             depth = load_and_scale_depth_test(i)
             depth_batch.append(depth)
     elif args.test == "eigen":
