@@ -132,29 +132,33 @@ def load_dataset(dataset_name):
 
                 return image_filenames, depth_filenames
 
-            image_filenames, depth_filenames = read_text_file(
+            train_image_filenames, train_depth_filenames = read_text_file(
                 filename='/home/nicolas/MEGA/workspace/cGAN/data/{}_train.txt'.format(dataset_name),
                 dataset_path='/media/nicolas/nicolas_seagate/datasets/kitti/')
 
-            image = sorted(image_filenames)
-            depth = sorted(depth_filenames)
-            # image_val = sorted(image_validation)
-            # depth_val = sorted(depth_validation)
+            test_image_filenames, test_depth_filenames = read_text_file(
+                filename='/home/nicolas/MEGA/workspace/cGAN/data/{}_val.txt'.format(dataset_name),
+                dataset_path='/media/nicolas/nicolas_seagate/datasets/kitti/')
 
-            train_images = image
-            train_labels = depth
+            train_images = sorted(train_image_filenames)
+            train_labels = sorted(train_depth_filenames)
+            test_images = sorted(test_image_filenames)
+            test_labels = sorted(test_depth_filenames)
+
             # test_images = image_val
             # test_labels = depth_val
 
-            print(len(image))
-            print(len(depth))
+            print(len(train_images))
+            print(len(train_labels))
+            print(len(test_images))
+            print(len(test_labels))
 
             timer1 += time.time()
 
         except OSError:
             raise SystemExit
 
-    return train_images, train_labels
+    return train_images, train_labels, test_images, test_labels
 
 
 def load_and_scale_image(filepath):
