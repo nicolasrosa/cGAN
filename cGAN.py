@@ -169,26 +169,6 @@ def train():
         cbar.set_ticks(cbar_ticks)
         cbar.draw_all()
 
-    def sample_images():
-        # os.makedirs('images/%s' % dataset_name, exist_ok=True)
-
-        imgs_B = load_and_scale_image(train_images[0])
-        imgs_A = load_and_scale_depth(train_labels[0])
-        fake_A = generator.predict(imgs_B)
-
-        gen_imgs = np.concatenate([fake_A, imgs_A])
-
-        cax0.set_data(gen_imgs[0, :, :, 0])
-        update_colorbar(cbar0, gen_imgs[0, :, :, 0])
-
-        cax1.set_data(gen_imgs[1, :, :, 0])
-        update_colorbar(cbar1, gen_imgs[1, :, :, 0])
-
-        # plt.show()
-        plt.draw()
-        plt.pause(0.0001)
-        # plt.close('all')
-
     for epoch in range(epochs):
         batch_start = 0
         batch_end = batch_size
@@ -234,6 +214,18 @@ def train():
             g_loss = combined.train_on_batch([imgs_A, imgs_B], [valid, imgs_A])
 
             elapsed_time = time.time() - start_time
+
+            def sample_images():
+                cax0.set_data(fake_A[0, :, :, 0])
+                update_colorbar(cbar0, fake_A[0, :, :, 0])
+
+                cax1.set_data(imgs_A[0, :, :, 0])
+                update_colorbar(cbar1, imgs_A[0, :, :, 0])
+
+                # plt.show()
+                plt.draw()
+                plt.pause(0.0001)
+                # plt.close('all')
 
             # timer1 = -time.time()
             sample_images()
