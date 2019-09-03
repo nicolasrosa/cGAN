@@ -308,18 +308,18 @@ def test():
         y_pred.append(fake_A[0, :, :, 0])
 
     # Resize Predictions
-    y_pred_resized = []
+    y_pred_up = []
     for pred in y_pred:
         pred_resized = cv2.resize(pred, (1242, 375), interpolation=cv2.INTER_LINEAR)
-        y_pred_resized.append(pred_resized)
+        y_pred_up.append(pred_resized)
 
-    y_pred_resized = np.array(y_pred_resized)  # list -> np.array
+    y_pred_up = np.array(y_pred_up)  # list -> np.array
 
     # Mask
-    imask_50 = np.where(y_pred_resized < 50.0, np.ones_like(y_pred_resized), np.zeros_like(y_pred_resized))
-    imask_80 = np.where(y_pred_resized < 80.0, np.ones_like(y_pred_resized), np.zeros_like(y_pred_resized))
-    pred_50 = np.multiply(y_pred_resized, imask_50)
-    pred_80 = np.multiply(y_pred_resized, imask_80)
+    imask_50 = np.where(y_pred_up < 50.0, np.ones_like(y_pred_up), np.zeros_like(y_pred_up))
+    imask_80 = np.where(y_pred_up < 80.0, np.ones_like(y_pred_up), np.zeros_like(y_pred_up))
+    pred_50 = np.multiply(y_pred_up, imask_50)
+    pred_80 = np.multiply(y_pred_up, imask_80)
 
     # print(np.array(pred_50).max())
     # print(np.array(pred_80).max())
@@ -329,24 +329,21 @@ def test():
     # -------------
     print('\nGenerating ground truth images...')
 
-    depth_batch = []
+    gt_depths = []
     if args.test_split == "kitti_depth":
         for i in tqdm(range(num_test_images)):
             depth = load_and_scale_depth(test_labels[i], (1242, 375))
-            depth_batch.append(depth[0, :, :, 0])
+            gt_depths.append(depth[0, :, :, 0])
 
     elif args.test_split == "eigen":
         gt_depths = generate_depth_maps_eigen_split()
 
-
-        depth_batch = []
         for i in tqdm(range(num_test_images)):
-            depth = cv2.resize(gt_depths[i], (1242, 375), interpolation=cv2.INTER_LINEAR)
-            depth_batch.append(depth)
+            gt_depths[i] = cv2.resize(gt_depths[i], (1242, 375), interpolation=cv2.INTER_LINEAR)
     else:
         raise SystemError
 
-    depth_batch = np.array(depth_batch)  # list -> np.array
+    gt_depths = np.array(gt_depths)  # list -> np.array
 
     # Plot
     if showImages:
@@ -358,7 +355,7 @@ def test():
             plt.figure(3)
             plt.imshow(pred_80[i])
             plt.figure(4)
-            plt.imshow(depth_batch[i])
+            plt.imshow(gt_depths[i])
             plt.pause(0.0001)
             plt.draw()
 
@@ -379,23 +376,22 @@ def test():
     print('Computing metrics...')
     for i in tqdm(range(num_test_images)):
         if args.mask == "50":
-            pred_depth = pred_50[i, :, :]
+            pred_depth = pred_50[i]
         elif args.mask == "80":
-            pred_depth = pred_80[i, :, :]
+            pred_depth = pred_80[i]
         elif args.mask == "None":
-            pred_depth = y_pred_resized[i, :, :]
+            pred_depth = y_pred_up[i]
         else:
             raise SystemError
 
-        gt_depth = depth_batch[i, :, :]
+        gt_depth = gt_depths[i]
 
         pred_depth[pred_depth < (10.0 ** -3.0)] = 10.0 ** -3.0
         pred_depth[pred_depth > 80.0] = 80.0
 
         mask = gt_depth > 0
 
-        abs_rel[i], sq_rel[i], rms[i], log_rms[i], a1[i], a2[i], a3[i] = compute_errors(gt_depth[mask],
-                                                                                        pred_depth[mask])
+        abs_rel[i], sq_rel[i], rms[i], log_rms[i], a1[i], a2[i], a3[i] = compute_errors(gt_depth[mask], pred_depth[mask])
 
     print("\nMetrics Results")
     print("abs_rel: {}".format(abs_rel.mean()))
