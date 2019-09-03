@@ -4,9 +4,9 @@ import time
 import cv2
 import imageio
 import numpy as np
-from keras_preprocessing.image import img_to_array, load_img
-from evaluation import read_text_lines, read_file_data, generate_depth_map
 from tqdm import tqdm
+
+from evaluation import read_text_lines, read_file_data, generate_depth_map
 
 
 def load_dataset(dataset_name):
@@ -142,7 +142,7 @@ def load_dataset(dataset_name):
                 filename='/home/nicolas/MEGA/workspace/cGAN/data/eigen_test_kitti_depth_files.txt',
                 dataset_path='/media/nicolas/nicolas_seagate/datasets/kitti/')
 
-            image_eigen,gt_eigen = read_text_file(
+            image_eigen, gt_eigen = read_text_file(
                 filename='/home/nicolas/MEGA/workspace/cGAN/data/eigen_test_files.txt',
                 dataset_path='/media/nicolas/nicolas_seagate/datasets/kitti/raw_data/')
 
@@ -168,11 +168,14 @@ def load_dataset(dataset_name):
         except OSError:
             raise SystemExit
 
-    return train_images, train_labels, test_images_kitti_depth, test_labels_kitti_depth, test_images_eigen, test_labels_eigen
+    return train_images, train_labels, \
+           test_images_kitti_depth, test_labels_kitti_depth, \
+           test_images_eigen, test_labels_eigen
 
-def load_and_scale_image(filepath):
+
+def load_and_scale_image(filepath, size):
     image_input = imageio.imread(filepath)
-    image_input = cv2.resize(image_input, (256,256), interpolation=cv2.INTER_AREA)
+    image_input = cv2.resize(image_input, size, interpolation=cv2.INTER_AREA)
     image_input = np.expand_dims(image_input, axis=0)
     image_input = image_input.astype(np.float32)
 
@@ -193,6 +196,7 @@ def load_and_scale_depth(filepath, size):
     return image_input
     # return (image_input / 42.5) - 1
 
+
 def generate_depth_maps_eigen_split():
     gt_path = '/media/nicolas/nicolas_seagate/datasets/kitti/raw_data/'
     file_path = 'data/eigen_test_files.txt'
@@ -210,6 +214,5 @@ def generate_depth_maps_eigen_split():
         gt_depth = generate_depth_map(gt_calib[t_id], gt_files[t_id], im_sizes[t_id], camera_id, False, False)
 
         gt_depths.append(gt_depth.astype(np.float32))
-
 
     return gt_depths

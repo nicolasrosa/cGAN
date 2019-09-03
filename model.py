@@ -19,12 +19,13 @@ class cGAN:
         """Layers used during upsampling"""
         # u = tf.keras.layers.UpSampling2D(size=2)(layer_input)
         # u = tf.keras.layers.Conv2D(filters, kernel_size=f_size, strides=1, padding='same', activation='relu')(u)
-        u = tf.keras.layers.Conv2DTranspose(filters,kernel_size=f_size,strides=2,padding='same',activation='relu')(layer_input)
+        u = tf.keras.layers.Conv2DTranspose(filters, kernel_size=f_size, strides=2, padding='same', activation='relu')(
+            layer_input)
         if dropout_rate:
             u = tf.keras.layers.Dropout(dropout_rate)(u)
         u = tf.keras.layers.BatchNormalization(momentum=0.8)(u)
         u = tf.keras.layers.Concatenate()([u, skip_input])
-        u = tf.keras.layers.Conv2D(filters,kernel_size=f_size,strides=1,padding='same',activation='relu')(u)
+        u = tf.keras.layers.Conv2D(filters, kernel_size=f_size, strides=1, padding='same', activation='relu')(u)
         return u
 
     # ================= #

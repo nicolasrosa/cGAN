@@ -16,8 +16,8 @@ from keras.backend.tensorflow_backend import set_session
 from tqdm import tqdm
 
 from dataset_handler import load_dataset, load_and_scale_image, load_and_scale_depth, generate_depth_maps_eigen_split
-from model import cGAN
 from evaluation import compute_errors
+from model import cGAN
 
 # ================= #
 #  Global Variables #
@@ -36,6 +36,7 @@ tf.logging.set_verbosity(tf.logging.ERROR)  # TODO: comment this line
 datetime_var = datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
 
 showImages = False  # TODO: create args
+
 
 # ========== #
 #  Functions #
@@ -109,8 +110,8 @@ def train():
     if args.single_image:
         train_images = [train_images[0]]
         train_labels = [train_labels[0]]
-        numSamples=0
-        batch_size=1
+        numSamples = 0
+        batch_size = 1
 
     # -------------------------
     # Construct Computational
@@ -171,13 +172,13 @@ def train():
     def sample_images():
         # os.makedirs('images/%s' % dataset_name, exist_ok=True)
 
-        imgs_B = load_and_scale_image(train_images[0])
-        imgs_A = load_and_scale_depth(train_labels[0], (256,256))
+        imgs_B = load_and_scale_image(train_images[0], (256, 256))
+        imgs_A = load_and_scale_depth(train_labels[0], (256, 256))
         fake_A = generator.predict(imgs_B)
 
         gen_imgs = np.concatenate([fake_A, imgs_A])
-        gen_imgs[0] = np.exp(gen_imgs[0])-1
-        gen_imgs[1] = np.exp(gen_imgs[1])-1
+        gen_imgs[0] = np.exp(gen_imgs[0]) - 1
+        gen_imgs[1] = np.exp(gen_imgs[1]) - 1
 
         cax0.set_data(gen_imgs[0, :, :, 0])
         update_colorbar(cbar0, gen_imgs[0, :, :, 0])
@@ -206,8 +207,8 @@ def train():
                 imgs_B = np.concatenate(list(map(load_and_scale_image, train_images[batch_start:limit])), 0)
                 imgs_A = np.concatenate(list(map(load_and_scale_depth, train_labels[batch_start:limit])), 0)
             except ValueError:  # Single Image Workaround
-                imgs_B = load_and_scale_image(train_images[0])
-                imgs_A = load_and_scale_depth(train_labels[0])
+                imgs_B = load_and_scale_image(train_images[0], (256, 256))
+                imgs_A = load_and_scale_depth(train_labels[0], (256, 256))
 
             # print(imgs_A.shape)
             # print(imgs_B.shape)
@@ -269,7 +270,8 @@ def test():
     # --------
     # Dataset
     # --------
-    _, _, test_images_kitti_depth, test_labels_kitti_depth, test_images_eigen, test_labels_eigen = load_dataset(args.dataset_name)
+    _, _, test_images_kitti_depth, test_labels_kitti_depth, test_images_eigen, test_labels_eigen = load_dataset(
+        args.dataset_name)
 
     if args.test_split == 'kitti_depth':
         test_images = test_images_kitti_depth
@@ -303,7 +305,7 @@ def test():
     print('Generating Predictions...')
     y_pred = []
     for k in tqdm(range(num_test_images)):
-        imgs_B = load_and_scale_image(test_images[k])
+        imgs_B = load_and_scale_image(test_images[k], (256, 256))
         fake_A = generator.predict(imgs_B)
         y_pred.append(fake_A[0, :, :, 0])
 
@@ -391,7 +393,8 @@ def test():
 
         mask = gt_depth > 0
 
-        abs_rel[i], sq_rel[i], rms[i], log_rms[i], a1[i], a2[i], a3[i] = compute_errors(gt_depth[mask], pred_depth[mask])
+        abs_rel[i], sq_rel[i], rms[i], log_rms[i], a1[i], a2[i], a3[i] = compute_errors(gt_depth[mask],
+                                                                                        pred_depth[mask])
 
     print("\nMetrics Results")
     print("abs_rel: {}".format(abs_rel.mean()))
@@ -402,7 +405,7 @@ def test():
     print("a2: {}".format(a2.mean()))
     print("a3: {}".format(a3.mean()))
 
-    print("Testing completed.")
+    print("\nTesting completed.")
 
 
 # ===== #
@@ -417,5 +420,3 @@ if __name__ == '__main__':
         test()
     else:
         raise SystemError
-
-    print("Done.")
