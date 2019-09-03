@@ -176,22 +176,7 @@ def train():
         imgs_A = load_and_scale_depth(train_labels[0])
         fake_A = generator.predict(imgs_B)
 
-        print(imgs_B.shape, img_B.dtype)
-        print(imgs_A.shape, img_A.dtype)
-        print(fake_A.shape, fake_A.dtype)
-        input("aki")
-
-        # plt.figure(10)
-        # plt.imshow(imgs_B[0,:,:,:])
-        plt.figure(11)
-        plt.imshow(img_A[0,:,:,0])
-        # plt.figure(12)
-        # plt.imshow(fake_A[0,:,:,0])
-        plt.show()
-
         gen_imgs = np.concatenate([fake_A, imgs_A])
-        gen_imgs[0] = np.exp(gen_imgs[0]) - 1
-        gen_imgs[1] = np.exp(gen_imgs[1]) - 1
 
         cax0.set_data(gen_imgs[0, :, :, 0])
         update_colorbar(cbar0, gen_imgs[0, :, :, 0])
