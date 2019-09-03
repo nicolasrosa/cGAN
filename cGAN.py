@@ -35,7 +35,7 @@ tf.logging.set_verbosity(tf.logging.ERROR)  # TODO: comment this line
 
 datetime_var = datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
 
-showImages = True  # TODO: create args
+showImages = False  # TODO: create args
 
 # ========== #
 #  Functions #
@@ -361,6 +361,9 @@ def test():
             plt.imshow(depth_batch[i])
             plt.pause(0.0001)
             plt.draw()
+
+    # Free Memory
+    del y_pred
 
     # --------
     # Metrics
