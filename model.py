@@ -17,12 +17,14 @@ class cGAN:
     @staticmethod
     def deconv2d(layer_input, skip_input, filters, f_size=4, dropout_rate=0):
         """Layers used during upsampling"""
-        u = tf.keras.layers.UpSampling2D(size=2)(layer_input)
-        u = tf.keras.layers.Conv2D(filters, kernel_size=f_size, strides=1, padding='same', activation='relu')(u)
+        # u = tf.keras.layers.UpSampling2D(size=2)(layer_input)
+        # u = tf.keras.layers.Conv2D(filters, kernel_size=f_size, strides=1, padding='same', activation='relu')(u)
+        u = tf.keras.layers.Conv2DTranspose(filters,kernel_size=f_size,strides=2,padding='same',activation='relu')(layer_input)
         if dropout_rate:
             u = tf.keras.layers.Dropout(dropout_rate)(u)
         u = tf.keras.layers.BatchNormalization(momentum=0.8)(u)
         u = tf.keras.layers.Concatenate()([u, skip_input])
+        u = tf.keras.layers.Conv2D(filters,kernel_size=f_size,strides=1,padding='same',activation='relu')(u)
         return u
 
     # ================= #
@@ -51,10 +53,12 @@ class cGAN:
         u5 = self.deconv2d(u4, d2, gf * 2)
         u6 = self.deconv2d(u5, d1, gf)
 
-        u7 = tf.keras.layers.UpSampling2D(size=2)(u6)
+        # u7 = tf.keras.layers.UpSampling2D(size=2)(u6)
 
-        output_img = tf.keras.layers.Conv2D(self.depth_shape[2], kernel_size=4, strides=1, padding='same',
-                                            activation='linear')(u7)  # TODO: 'tanh' ou 'linear'?
+        # output_img = tf.keras.layers.Conv2D(self.depth_shape[2], kernel_size=4, strides=1, padding='same',
+        #                                     activation='linear')(u7)  # TODO: 'tanh' ou 'linear'?
+        output_img = tf.keras.layers.Conv2DTranspose(self.depth_shape[2], kernel_size=4, strides=2, padding='same',
+                                                     activation='linear')(u6)
 
         return tf.keras.Model(d0, output_img)
 

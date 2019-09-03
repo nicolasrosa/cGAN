@@ -140,11 +140,11 @@ def load_dataset(dataset_name):
 
             image_kitti_depth, gt_kitti_depth = read_text_file(
                 filename='/home/nicolas/MEGA/workspace/cGAN/data/eigen_test_kitti_depth_files.txt',
-                dataset_path='/media/olorin/Documentos/datasets/kitti/')
+                dataset_path='/media/nicolas/nicolas_seagate/datasets/kitti/')
 
             image_eigen,gt_eigen = read_text_file(
                 filename='/home/nicolas/MEGA/workspace/cGAN/data/eigen_test_files.txt',
-                dataset_path='/media/olorin/Documentos/datasets/kitti/raw_data')
+                dataset_path='/media/nicolas/nicolas_seagate//datasets/kitti/raw_data')
 
             image = sorted(image_filenames)
             depth = sorted(depth_filenames)
@@ -179,9 +179,9 @@ def load_and_scale_image(filepath):
     return (image_input / 127.5) - 1
 
 
-def load_and_scale_depth(filepath):
+def load_and_scale_depth(filepath, size):
     image_input = imageio.imread(filepath)
-    image_input = cv2.resize(image_input, (256,256), interpolation=cv2.INTER_AREA)
+    image_input = cv2.resize(image_input, size, interpolation=cv2.INTER_AREA)
     image_input = np.expand_dims(image_input, axis=-1) / 256.0  # TODO: Nem todos datasets serão 256.0
     image_input = image_input.astype(np.float32)  # float64 -> float32
     image_input = np.expand_dims(image_input, axis=0)
@@ -212,8 +212,4 @@ def generate_depth_maps_eigen_split():
         gt_depths.append(gt_depth.astype(np.float32))
 
 
-    return gt_depths
-
-def load_and_scale_depth_test(filepath):
-    gt_depths = img_to_array(load_img(filepath,target_size=(375,1242),interpolation='lanczos')) / 256.0
     return gt_depths

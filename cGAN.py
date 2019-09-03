@@ -15,7 +15,7 @@ import tensorflow as tf
 from keras.backend.tensorflow_backend import set_session
 from tqdm import tqdm
 
-from dataset_handler import load_dataset, load_and_scale_image, load_and_scale_depth
+from dataset_handler import load_dataset, load_and_scale_image, load_and_scale_depth, generate_depth_maps_eigen_split
 from model import cGAN
 from evaluation import compute_errors
 
@@ -55,7 +55,7 @@ def args_handler():
 
     parser.add_argument("-p", "--plot", type=int, help="Define plot interval (epochs number).", default=1)
     parser.add_argument("-t", "--test", type=str, help="Choose kitti depth or eigen to test (kitti or eigen).",
-                        default="kitti")
+                        default="kitti_depth")
     parser.add_argument("-a", "--mask", type=str, help="Set depth mask (50, 80 or None).", default="None")
     return parser.parse_args()
 
@@ -170,7 +170,7 @@ def train():
         # os.makedirs('images/%s' % dataset_name, exist_ok=True)
 
         imgs_B = load_and_scale_image(train_images[0])
-        imgs_A = load_and_scale_depth(train_labels[0])
+        imgs_A = load_and_scale_depth(train_labels[0], (256,256))
         fake_A = generator.predict(imgs_B)
 
         gen_imgs = np.concatenate([fake_A, imgs_A])
@@ -264,34 +264,22 @@ def test():
     img_shape = (img_rows, img_cols, channels)
     depth_shape = (img_rows, img_cols, channels_depth)
 
+    # --------
+    # Dataset
+    # --------
+    _, _, test_images_kitti_depth, test_labels_kitti_depth, test_images_eigen, test_labels_eigen = load_dataset(args.dataset_name)
 
-    def image_loader(image_filenames):
-        numSamples = len(image_filenames)
+    if args.test == 'kitti_depth':
+        test_images = test_images_kitti_depth
+        test_labels = test_labels_kitti_depth
+    elif args.test == 'eigen':
+        test_images = test_images_eigen
+        test_labels = test_labels_eigen
+    else:
+        raise SystemError
 
-        while True:
-            batch_start = 0
-            batch_end = 1
-
-            while batch_start < numSamples:
-
-                limit = min(batch_end, numSamples)
-
-                X_batch = np.concatenate(list(map(load_and_scale_image, image_filenames[batch_start:limit])), 0)
-
-                yield (X_batch)
-
-                if (limit + 1) <= numSamples:
-                    batch_start += 1
-                    batch_end += 1
-
-                else:
-                    del X_batch
-                    batch_start = 0
-                    batch_end = 1
-
-
-
-    _, _, test_images, test_labels, _, _ = load_dataset(args.dataset_name)
+    num_test_images = len(test_images)
+    # num_test_images = 10  # TODO: remover
 
     # --------
     # Model
@@ -300,87 +288,72 @@ def test():
     generator = model.build_generator()
     generator.summary()
 
-
-
     # -----------------------
     # Load generator weights
     # -----------------------
     # generator.load_weights('/home/nicolas/MEGA/workspace/cGAN/output/kitti_morphological/2019-09-02_10-29-44/weights_generator_bce.h5')
     generator.load_weights('/home/nicolas/MEGA/workspace/cGAN/output/weights_generator_linear4.h5')
 
-    numSamples = len(test_labels)
+    # Generate Predictions
+    print('Generating Predictions...')
     y_pred = []
-
-    print('Testing...')
-
-    numSamples = 10 # TODO: remover
-    for k in tqdm(range(numSamples)):
+    for k in tqdm(range(num_test_images)):
         imgs_B = load_and_scale_image(test_images[k])
         fake_A = generator.predict(imgs_B)
-        # fake_A = 0.5 * fake_A + 0.5
-        # fake_A = fake_A * 85.0
         y_pred.append(fake_A[0, :, :, 0])
 
-        plt.figure(1)
-        plt.imshow(fake_A[0, :,: ,0])
-        plt.pause(0.0001)
-        plt.draw()
-
-    # print(y_pred_final[0].shape, y_pred_final[0].max())
-
-    y_pred_final = []
+    # Resize Predictions
+    y_pred_resized = []
     for pred in y_pred:
         pred_resized = cv2.resize(pred, (1242, 375), interpolation=cv2.INTER_LINEAR)
-        y_pred_final.append(pred_resized)
+        y_pred_resized.append(pred_resized)
 
-    y_pred_final = np.array(y_pred_final)  # list -> np.array
+    y_pred_resized = np.array(y_pred_resized)  # list -> np.array
 
-    imask_50 = np.where(y_pred_final < 50.0, np.ones_like(y_pred_final), np.zeros_like(y_pred_final))
-    imask_80 = np.where(y_pred_final < 80.0, np.ones_like(y_pred_final), np.zeros_like(y_pred_final))
-    pred_50 = np.multiply(y_pred_final, imask_50)
-    pred_80 = np.multiply(y_pred_final, imask_80)
+    # Mask
+    imask_50 = np.where(y_pred_resized < 50.0, np.ones_like(y_pred_resized), np.zeros_like(y_pred_resized))
+    imask_80 = np.where(y_pred_resized < 80.0, np.ones_like(y_pred_resized), np.zeros_like(y_pred_resized))
+    pred_50 = np.multiply(y_pred_resized, imask_50)
+    pred_80 = np.multiply(y_pred_resized, imask_80)
 
-    for i in range(numSamples):
+    # print(np.array(pred_50).max())
+    # print(np.array(pred_80).max())
+
+    print('\nGenerating ground truth images...')
+
+    depth_batch = []
+    if args.test == "kitti_depth":
+        for i in tqdm(range(num_test_images)):
+            depth = load_and_scale_depth(test_labels[i], (1242, 375))
+            depth_batch.append(depth[0, :, :, 0])
+
+    elif args.test == "eigen":
+        gt_depths = generate_depth_maps_eigen_split()
+        depth_batch = []
+        for i in tqdm(range(num_test_images)):
+            depth = cv2.resize(gt_depths[i], (1242, 375), interpolation=cv2.INTER_LINEAR)
+            depth_batch.append(depth[0, :, :, 0])
+    else:
+        raise SystemError
+
+    depth_batch = np.array(depth_batch)  # list -> np.array
+
+    # Plot
+    for i in range(num_test_images):
+        plt.figure(1)
+        plt.imshow(y_pred[i])
         plt.figure(2)
         plt.imshow(pred_50[i])
         plt.figure(3)
         plt.imshow(pred_80[i])
+        plt.figure(4)
+        plt.imshow(depth_batch[i, :, :])
         plt.pause(0.0001)
         plt.draw()
 
-    print(np.array(pred_50).max())
-    print(np.array(pred_80).max())
-
-    input('Calculate metrics...')
-
-    depth_batch = []
-    if args.test == "kitti":
-        for i in test_labels:
-            depth = load_and_scale_depth_test(i)
-            depth_batch.append(depth)
-    elif args.test == "eigen":
-        gt_depths = generate_depth_maps_eigen_split()
-        depth_batch = []
-        for i in gt_depths:
-            depth = cv2.resize(i, (1242, 375), interpolation=cv2.INTER_LINEAR)
-            depth_batch.append(depth)
-    else:
-        raise SystemError
-
-    depth_batch = np.expand_dims(depth_batch, -1)
-    depth_batch = depth_batch.astype(np.float32)
-
-    print(depth_batch.shape)
-    print(depth_batch.max())
-
-    for i in range(5):
-        plt.subplot(1, 5, i + 1)
-        plt.imshow(depth_batch[i, :, :, 0])
-        plt.colorbar()
-    plt.show()
-
-    num_test_images = len(y_pred_final)
-
+    # --------
+    # Metrics
+    # --------
     rms = np.zeros(num_test_images, np.float32)
     log_rms = np.zeros(num_test_images, np.float32)
     abs_rel = np.zeros(num_test_images, np.float32)
@@ -391,43 +364,33 @@ def test():
 
     print('Computing metrics...')
     for i in tqdm(range(num_test_images)):
-        try:
-            if args.mask == "50":
-                pred_depth = pred_50[i, :, :, 0]
-            elif args.mask == "80":
-                pred_depth = pred_80[i, :, :, 0]
-            elif args.mask == "None":
-                pred_depth = y_pred_final[i, :, :, 0]
-            else:
-                raise SystemError
+        if args.mask == "50":
+            pred_depth = pred_50[i, :, :]
+        elif args.mask == "80":
+            pred_depth = pred_80[i, :, :]
+        elif args.mask == "None":
+            pred_depth = y_pred_resized[i, :, :]
+        else:
+            raise SystemError
 
-            gt_depth = depth_batch[i, :, :, 0]
+        gt_depth = depth_batch[i, :, :]
 
-            pred_depth[pred_depth < (10.0 ** -3.0)] = 10.0 ** -3.0
-            pred_depth[pred_depth > 80.0] = 80.0
+        pred_depth[pred_depth < (10.0 ** -3.0)] = 10.0 ** -3.0
+        pred_depth[pred_depth > 80.0] = 80.0
 
-            mask = gt_depth > 0
+        mask = gt_depth > 0
 
-            abs_rel[i], sq_rel[i], rms[i], log_rms[i], a1[i], a2[i], a3[i] = compute_errors(gt_depth[mask],
-                                                                                            pred_depth[mask])
+        abs_rel[i], sq_rel[i], rms[i], log_rms[i], a1[i], a2[i], a3[i] = compute_errors(gt_depth[mask],
+                                                                                        pred_depth[mask])
 
-        except IndexError:
-            break
-
-    print("abs_rel:")
-    print(abs_rel.mean())
-    print("sq_rel:")
-    print(sq_rel.mean())
-    print("rms_rel:")
-    print(rms.mean())
-    print("log_rms:")
-    print(log_rms.mean())
-    print("a1:")
-    print(a1.mean())
-    print("a2:")
-    print(a2.mean())
-    print("a3:")
-    print(a3.mean())
+    print("\nMetrics Results")
+    print("abs_rel: {}".format(abs_rel.mean()))
+    print("sq_rel: {}".format(sq_rel.mean()))
+    print("rms_rel: {}".format(rms.mean()))
+    print("log_rms: {}".format(log_rms.mean()))
+    print("a1: {}".format(a1.mean()))
+    print("a2: {}".format(a2.mean()))
+    print("a3: {}".format(a3.mean()))
 
     print("Testing completed.")
 
