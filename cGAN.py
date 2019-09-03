@@ -35,6 +35,8 @@ tf.logging.set_verbosity(tf.logging.ERROR)  # TODO: comment this line
 
 datetime_var = datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
 
+showImages = True  # TODO: create args
+
 # ========== #
 #  Functions #
 # ========== #
@@ -54,7 +56,7 @@ def args_handler():
     parser.add_argument("--single_image", action='store_true', help="Train model on a single image.", default=False)
 
     parser.add_argument("-p", "--plot", type=int, help="Define plot interval (epochs number).", default=1)
-    parser.add_argument("-t", "--test", type=str, help="Choose kitti depth or eigen to test (kitti or eigen).",
+    parser.add_argument("-t", "--test_split", type=str, help="Choose kitti depth or eigen to test (kitti or eigen).",
                         default="kitti_depth")
     parser.add_argument("-a", "--mask", type=str, help="Set depth mask (50, 80 or None).", default="None")
     return parser.parse_args()
@@ -269,17 +271,17 @@ def test():
     # --------
     _, _, test_images_kitti_depth, test_labels_kitti_depth, test_images_eigen, test_labels_eigen = load_dataset(args.dataset_name)
 
-    if args.test == 'kitti_depth':
+    if args.test_split == 'kitti_depth':
         test_images = test_images_kitti_depth
         test_labels = test_labels_kitti_depth
-    elif args.test == 'eigen':
+    elif args.test_split == 'eigen':
         test_images = test_images_eigen
         test_labels = test_labels_eigen
     else:
         raise SystemError
 
     num_test_images = len(test_images)
-    # num_test_images = 10  # TODO: remover
+    # num_test_images = 10
 
     # --------
     # Model
@@ -294,6 +296,9 @@ def test():
     # generator.load_weights('/home/nicolas/MEGA/workspace/cGAN/output/kitti_morphological/2019-09-02_10-29-44/weights_generator_bce.h5')
     generator.load_weights('/home/nicolas/MEGA/workspace/cGAN/output/weights_generator_linear4.h5')
 
+    # ------------
+    # Predictions
+    # ------------
     # Generate Predictions
     print('Generating Predictions...')
     y_pred = []
@@ -319,37 +324,43 @@ def test():
     # print(np.array(pred_50).max())
     # print(np.array(pred_80).max())
 
+    # -------------
+    # Ground-Truth
+    # -------------
     print('\nGenerating ground truth images...')
 
     depth_batch = []
-    if args.test == "kitti_depth":
+    if args.test_split == "kitti_depth":
         for i in tqdm(range(num_test_images)):
             depth = load_and_scale_depth(test_labels[i], (1242, 375))
             depth_batch.append(depth[0, :, :, 0])
 
-    elif args.test == "eigen":
+    elif args.test_split == "eigen":
         gt_depths = generate_depth_maps_eigen_split()
+
+
         depth_batch = []
         for i in tqdm(range(num_test_images)):
             depth = cv2.resize(gt_depths[i], (1242, 375), interpolation=cv2.INTER_LINEAR)
-            depth_batch.append(depth[0, :, :, 0])
+            depth_batch.append(depth)
     else:
         raise SystemError
 
     depth_batch = np.array(depth_batch)  # list -> np.array
 
     # Plot
-    for i in range(num_test_images):
-        plt.figure(1)
-        plt.imshow(y_pred[i])
-        plt.figure(2)
-        plt.imshow(pred_50[i])
-        plt.figure(3)
-        plt.imshow(pred_80[i])
-        plt.figure(4)
-        plt.imshow(depth_batch[i, :, :])
-        plt.pause(0.0001)
-        plt.draw()
+    if showImages:
+        for i in range(num_test_images):
+            plt.figure(1)
+            plt.imshow(y_pred[i])
+            plt.figure(2)
+            plt.imshow(pred_50[i])
+            plt.figure(3)
+            plt.imshow(pred_80[i])
+            plt.figure(4)
+            plt.imshow(depth_batch[i])
+            plt.pause(0.0001)
+            plt.draw()
 
     # --------
     # Metrics
@@ -407,3 +418,5 @@ if __name__ == '__main__':
         test()
     else:
         raise SystemError
+
+    print("Done.")

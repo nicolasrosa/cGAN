@@ -144,7 +144,7 @@ def load_dataset(dataset_name):
 
             image_eigen,gt_eigen = read_text_file(
                 filename='/home/nicolas/MEGA/workspace/cGAN/data/eigen_test_files.txt',
-                dataset_path='/media/nicolas/nicolas_seagate//datasets/kitti/raw_data')
+                dataset_path='/media/nicolas/nicolas_seagate/datasets/kitti/raw_data/')
 
             image = sorted(image_filenames)
             depth = sorted(depth_filenames)
@@ -194,7 +194,7 @@ def load_and_scale_depth(filepath, size):
     # return (image_input / 42.5) - 1
 
 def generate_depth_maps_eigen_split():
-    gt_path = '/media/olorin/Documentos/datasets/kitti/raw_data/'
+    gt_path = '/media/nicolas/nicolas_seagate/datasets/kitti/raw_data/'
     file_path = 'data/eigen_test_files.txt'
 
     num_test_images = 697
@@ -203,7 +203,7 @@ def generate_depth_maps_eigen_split():
     gt_files, gt_calib, im_sizes, im_files, cams = read_file_data(test_files, gt_path)
 
     gt_depths = []
-    print('\n[Metrics] Generating depth maps...')
+    print('\n[Metrics] Generating ground truth depth maps...')
 
     for t_id in tqdm(range(num_test_images)):
         camera_id = cams[t_id]  # 2 is left, 3 is right
