@@ -173,20 +173,20 @@ def load_dataset(dataset_name):
            test_images_eigen, test_labels_eigen
 
 
-def load_and_scale_image(filepath, size):
+def load_and_scale_image(filepath, size=(256, 256)):
     image_input = imageio.imread(filepath)
     image_input = cv2.resize(image_input, size, interpolation=cv2.INTER_AREA)
     image_input = np.expand_dims(image_input, axis=0)
-    image_input = image_input.astype(np.float32)
+    # image_input = image_input.astype(np.float32)
 
     return (image_input / 127.5) - 1
 
 
-def load_and_scale_depth(filepath, size):
+def load_and_scale_depth(filepath, size=(256, 256)):
     image_input = imageio.imread(filepath)
     image_input = cv2.resize(image_input, size, interpolation=cv2.INTER_AREA)
     image_input = np.expand_dims(image_input, axis=-1) / 256.0  # TODO: Nem todos datasets serão 256.0
-    image_input = image_input.astype(np.float32)  # float64 -> float32
+    # image_input = image_input.astype(np.float32)  # float64 -> float32
     image_input = np.expand_dims(image_input, axis=0)
 
     # print(image_input.shape, image_input.dtype)
@@ -212,7 +212,6 @@ def generate_depth_maps_eigen_split():
     for t_id in tqdm(range(num_test_images)):
         camera_id = cams[t_id]  # 2 is left, 3 is right
         gt_depth = generate_depth_map(gt_calib[t_id], gt_files[t_id], im_sizes[t_id], camera_id, False, False)
-
         gt_depths.append(gt_depth.astype(np.float32))
 
     return gt_depths

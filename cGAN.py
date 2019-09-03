@@ -104,7 +104,7 @@ def train():
     # --------
     # Dataset
     # --------
-    train_images, train_labels, _, _ = load_dataset(dataset_name)
+    train_images, train_labels, _, _, _, _ = load_dataset(dataset_name)
     numSamples = len(train_images)
 
     if args.single_image:
@@ -172,9 +172,22 @@ def train():
     def sample_images():
         # os.makedirs('images/%s' % dataset_name, exist_ok=True)
 
-        imgs_B = load_and_scale_image(train_images[0], (256, 256))
-        imgs_A = load_and_scale_depth(train_labels[0], (256, 256))
+        imgs_B = load_and_scale_image(train_images[0])
+        imgs_A = load_and_scale_depth(train_labels[0])
         fake_A = generator.predict(imgs_B)
+
+        print(imgs_B.shape, img_B.dtype)
+        print(imgs_A.shape, img_A.dtype)
+        print(fake_A.shape, fake_A.dtype)
+        input("aki")
+
+        # plt.figure(10)
+        # plt.imshow(imgs_B[0,:,:,:])
+        plt.figure(11)
+        plt.imshow(img_A[0,:,:,0])
+        # plt.figure(12)
+        # plt.imshow(fake_A[0,:,:,0])
+        plt.show()
 
         gen_imgs = np.concatenate([fake_A, imgs_A])
         gen_imgs[0] = np.exp(gen_imgs[0]) - 1
@@ -207,8 +220,8 @@ def train():
                 imgs_B = np.concatenate(list(map(load_and_scale_image, train_images[batch_start:limit])), 0)
                 imgs_A = np.concatenate(list(map(load_and_scale_depth, train_labels[batch_start:limit])), 0)
             except ValueError:  # Single Image Workaround
-                imgs_B = load_and_scale_image(train_images[0], (256, 256))
-                imgs_A = load_and_scale_depth(train_labels[0], (256, 256))
+                imgs_B = load_and_scale_image(train_images[0])
+                imgs_A = load_and_scale_depth(train_labels[0])
 
             # print(imgs_A.shape)
             # print(imgs_B.shape)
@@ -305,7 +318,7 @@ def test():
     print('Generating Predictions...')
     y_pred = []
     for k in tqdm(range(num_test_images)):
-        imgs_B = load_and_scale_image(test_images[k], (256, 256))
+        imgs_B = load_and_scale_image(test_images[k])
         fake_A = generator.predict(imgs_B)
         y_pred.append(fake_A[0, :, :, 0])
 
@@ -334,7 +347,7 @@ def test():
     gt_depths = []
     if args.test_split == "kitti_depth":
         for i in tqdm(range(num_test_images)):
-            depth = load_and_scale_depth(test_labels[i], (1242, 375))
+            depth = load_and_scale_depth(test_labels[i], size=(1242, 375))
             gt_depths.append(depth[0, :, :, 0])
 
     elif args.test_split == "eigen":
