@@ -9,14 +9,32 @@ from tqdm import tqdm
 from evaluation import read_text_lines, read_file_data, generate_depth_map
 
 
+def read_text_file(filename, dataset_path):
+    print("\n[Dataloader] Loading '%s'..." % filename)
+    try:
+        data = np.genfromtxt(filename, dtype='str', delimiter='\t')
+        # print(data.shape)
+
+        # Parsing Data
+        image_filenames = list(data[:, 0])
+        depth_filenames = list(data[:, 1])
+
+        timer = -time.time()
+        image_filenames = [dataset_path + filename for filename in image_filenames]
+        depth_filenames = [dataset_path + filename for filename in depth_filenames]
+        timer += time.time()
+        print('time:', timer, 's\n')
+
+    except OSError:
+        raise OSError("Could not find the '%s' file." % filename)
+
+    return image_filenames, depth_filenames
+
 def load_dataset(dataset_name):
     train_images, train_labels = None, None
 
-    if not (
-            os.path.exists(
-                'data/{}_train.txt'.format(dataset_name))):  # and os.path.exists('kitti_guidenet_test(2).txt')):
-        timer1 = -time.time()
-
+    timer1 = -time.time()
+    if not (os.path.exists('data/{}_train.txt'.format(dataset_name))):  # and os.path.exists('kitti_guidenet_test(2).txt')):
         bad_words = ['image_03',
                      '2011_09_28_drive_0053_sync',
                      '2011_09_28_drive_0054_sync',
@@ -105,35 +123,10 @@ def load_dataset(dataset_name):
                 if not any(bad_word in line for bad_word in bad_words):
                     newfile.write(line)
 
-        timer1 += time.time()
-
     else:
 
-        timer1 = -time.time()
 
         try:
-
-            def read_text_file(filename, dataset_path):
-                print("\n[Dataloader] Loading '%s'..." % filename)
-                try:
-                    data = np.genfromtxt(filename, dtype='str', delimiter='\t')
-                    # print(data.shape)
-
-                    # Parsing Data
-                    image_filenames = list(data[:, 0])
-                    depth_filenames = list(data[:, 1])
-
-                    timer = -time.time()
-                    image_filenames = [dataset_path + filename for filename in image_filenames]
-                    depth_filenames = [dataset_path + filename for filename in depth_filenames]
-                    timer += time.time()
-                    print('time:', timer, 's\n')
-
-                except OSError:
-                    raise OSError("Could not find the '%s' file." % filename)
-
-                return image_filenames, depth_filenames
-
             image_filenames, depth_filenames = read_text_file(
                 filename='/home/nicolas/MEGA/workspace/cGAN/data/{}_train.txt'.format(dataset_name),
                 dataset_path='/media/nicolas/nicolas_seagate/datasets/kitti/')
@@ -163,10 +156,11 @@ def load_dataset(dataset_name):
             print(len(test_images_eigen))
             print(len(test_labels_eigen))
 
-            timer1 += time.time()
 
         except OSError:
             raise SystemExit
+
+    timer1 += time.time()
 
     return train_images, train_labels, \
            test_images_kitti_depth, test_labels_kitti_depth, \
