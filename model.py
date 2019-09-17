@@ -62,6 +62,16 @@ class cGAN:
 
         return keras.Model(d0, output_img)
 
+    def select_generator_model(self, model_name):
+        if model_name == 'resnet':
+            generator = self.build_generator_resnet()
+        elif model_name == 'resnet_raul':
+            generator = self.build_generator_resnet_raul()
+        else:
+            raise SystemError("Invalid network 'model_name'!")
+
+        return generator
+
     def build_generator_resnet(self):
         """U-Net Generator"""
 
@@ -84,6 +94,35 @@ class cGAN:
         conv3 = keras.layers.Conv2D(64, kernel_size=4, activation='relu', padding='same')(up3)
 
         up4 = keras.layers.Conv2DTranspose(64, kernel_size=4, activation='relu', padding='same', strides=2)(conv3)
+        conv4 = keras.layers.Conv2D(64, kernel_size=4, activation='relu', padding='same')(up4)
+
+        output_img = keras.layers.Conv2D(self.depth_shape[2], kernel_size=4, padding='same', activation='linear')(conv4)
+
+        return keras.Model(d0, output_img)
+
+
+    def build_generator_resnet_raul(self):
+        """ResNet Generator"""
+
+        d0 = keras.Input(shape=self.img_shape)
+
+        d = keras.applications.resnet_v2.ResNet101V2(include_top=False, weights='imagenet')
+        d.trainable = True
+        d = d(d0)
+
+        up0 = keras.layers.Conv2DTranspose(512, kernel_size=2, activation='relu', padding='same', strides=2)(d)
+        conv0 = keras.layers.Conv2D(512, kernel_size=4, activation='relu', padding='same')(up0)
+
+        up1 = keras.layers.Conv2DTranspose(256, kernel_size=2, activation='relu', padding='same', strides=2)(conv0)
+        conv1 = keras.layers.Conv2D(256, kernel_size=4, activation='relu', padding='same')(up1)
+
+        up2 = keras.layers.Conv2DTranspose(128, kernel_size=2, activation='relu', padding='same', strides=2)(conv1)
+        conv2 = keras.layers.Conv2D(128, kernel_size=4, activation='relu', padding='same')(up2)
+
+        up3 = keras.layers.Conv2DTranspose(64, kernel_size=2, activation='relu', padding='same', strides=2)(conv2)
+        conv3 = keras.layers.Conv2D(64, kernel_size=4, activation='relu', padding='same')(up3)
+
+        up4 = keras.layers.Conv2DTranspose(64, kernel_size=2, activation='relu', padding='same', strides=2)(conv3)
         conv4 = keras.layers.Conv2D(64, kernel_size=4, activation='relu', padding='same')(up4)
 
         output_img = keras.layers.Conv2D(self.depth_shape[2], kernel_size=4, padding='same', activation='linear')(conv4)

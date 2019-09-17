@@ -32,7 +32,7 @@ config.log_device_placement = True  # to log device placement (on which device t
 sess = tf.Session(config=config)
 set_session(sess)  # set this TensorFlow session as the default
 
-tf.logging.set_verbosity(tf.logging.ERROR)  # TODO: comment this line
+# tf.logging.set_verbosity(tf.logging.ERROR)
 
 datetime_var = datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
 
@@ -45,8 +45,9 @@ showImages = False  # TODO: create args
 # noinspection PyTypeChecker
 def args_handler():
     parser = argparse.ArgumentParser()
-    parser.add_argument("-m", "--mode", type=str, help="Chooses program mode.", required=True)
-    parser.add_argument("-d", "--dataset_name", type=str, help="Chooses dataset.", required=True)
+    parser.add_argument("-m", "--mode", type=str, help="Chooses the program mode.", required=True)
+    parser.add_argument("-d", "--dataset_name", type=str, help="Chooses the dataset.", required=True)
+    parser.add_argument("-n", "--model_name", type=str, help="Chooses the network", required=True)
 
     # TODO: Terminar de arrumar
     parser.add_argument("-e", "--epochs", type=int, help="Define train epochs number.", default=50)
@@ -129,7 +130,7 @@ def train():
                           optimizer=optimizer,
                           metrics=['accuracy'])
     # Build the generator
-    generator = model.build_generator_resnet() # TODO: criar argumento pra trocar de rede mais facil
+    generator = model.select_generator_model(args.model_name)
     generator.summary()
 
     # Input images and their conditioning images
@@ -281,15 +282,18 @@ def test():
     # Model
     # --------
     model = cGAN(img_shape, depth_shape)
-    generator = model.build_generator_resnet() # TODO: fazer esquema para saber qual rede logar
+    generator = model.select_generator_model(args.model_name)
     generator.summary()
 
     # -----------------------
     # Load generator weights
     # -----------------------
+    # TODO: Fazer aquele rotina de detectar quais modelos estão disponíveis. Dependendo do nome, selecionar arquitetura de rede corretamente, para então logar os pesos.
+    print('\nLoading the model...')
     # generator.load_weights('/home/nicolas/MEGA/workspace/cGAN/output/kitti_morphological/2019-09-02_10-29-44/weights_generator_bce.h5')
     # generator.load_weights('/home/nicolas/MEGA/workspace/cGAN/output/weights_generator_linear4.h5')
-    generator.load_weights('/home/nicolas/MEGA/workspace/cGAN/output/resnet/2019-09-13_11-03-36/weights_generator_bce.h5')
+    # generator.load_weights('/home/nicolas/MEGA/workspace/cGAN/output/resnet/2019-09-13_11-03-36/weights_generator_bce.h5')
+    generator.load_weights('/home/nicolas/MEGA/workspace/cGAN/output/resnet_raul/weights_generator_resnet.h5')
 
     # ------------
     # Predictions
@@ -303,18 +307,19 @@ def test():
         y_pred.append(fake_A[0, :, :, 0])
 
     # Resize Predictions
-    y_pred_up = []
-    for pred in y_pred:
-        pred_resized = cv2.resize(pred, (1242, 375), interpolation=cv2.INTER_LINEAR)
-        y_pred_up.append(pred_resized)
+    y_pred_up = np.zeros(shape=(num_test_images, 375, 1242))
 
-    y_pred_up = np.array(y_pred_up)  # list -> np.array
+    for k in tqdm(range(num_test_images)):
+        pred_resized = cv2.resize(y_pred[k], (1242, 375), interpolation=cv2.INTER_LINEAR)
+        y_pred_up[k] = pred_resized
+
+    # y_pred_up = np.array(y_pred_up)  # list -> np.array
 
     # Mask
-    imask_50 = np.where(y_pred_up < 50.0, np.ones_like(y_pred_up), np.zeros_like(y_pred_up))
-    imask_80 = np.where(y_pred_up < 80.0, np.ones_like(y_pred_up), np.zeros_like(y_pred_up))
-    pred_50 = np.multiply(y_pred_up, imask_50)
-    pred_80 = np.multiply(y_pred_up, imask_80)
+    # imask_50 = np.where(y_pred_up < 50.0, np.ones_like(y_pred_up), np.zeros_like(y_pred_up))  # TODO: Comentado devido MemoryError
+    # imask_80 = np.where(y_pred_up < 80.0, np.ones_like(y_pred_up), np.zeros_like(y_pred_up))  # TODO: Comentado devido MemoryError
+    # pred_50 = np.multiply(y_pred_up, imask_50)  # TODO: Comentado devido MemoryError
+    # pred_80 = np.multiply(y_pred_up, imask_80)  # TODO: Comentado devido MemoryError
 
     # print(np.array(pred_50).max())
     # print(np.array(pred_80).max())
@@ -345,10 +350,10 @@ def test():
         for i in range(num_test_images):
             plt.figure(1)
             plt.imshow(y_pred[i])
-            plt.figure(2)
-            plt.imshow(pred_50[i])
-            plt.figure(3)
-            plt.imshow(pred_80[i])
+            # plt.figure(2)  # TODO: Comentado devido MemoryError
+            # plt.imshow(pred_50[i])  # TODO: Comentado devido MemoryError
+            # plt.figure(3)  # TODO: Comentado devido MemoryError
+            # plt.imshow(pred_80[i])  # TODO: Comentado devido MemoryError
             plt.figure(4)
             plt.imshow(gt_depths[i])
             plt.pause(0.0001)
@@ -386,8 +391,7 @@ def test():
 
         mask = gt_depth > 0
 
-        abs_rel[i], sq_rel[i], rms[i], log_rms[i], a1[i], a2[i], a3[i] = compute_errors(gt_depth[mask],
-                                                                                        pred_depth[mask])
+        abs_rel[i], sq_rel[i], rms[i], log_rms[i], a1[i], a2[i], a3[i] = compute_errors(gt_depth[mask], pred_depth[mask])
 
     print("\nMetrics Results")
     print("abs_rel: {}".format(abs_rel.mean()))

@@ -43,6 +43,7 @@ def argument_handler():
     parser.add_argument('--gpu', type=str, help="Select which gpu to run the code", default='0')
     parser.add_argument('-r', '--model_path', help='Converted parameters for the model', default='')
     parser.add_argument('-i', '--video_path', help='Directory of images to predict', required=True)
+    parser.add_argument("-n", "--model_name", type=str, help="Chooses the network", required=True)
 
     return parser.parse_args()
 
@@ -242,16 +243,18 @@ def main():
     # Model
     # --------
     model = cGAN(img_shape, depth_shape)
-    generator = model.build_generator_resnet()  # TODO: fazer esquema para saber qual rede logar
+    generator = model.select_generator_model(args.model_name)
     generator.summary()
 
     # -----------------------
     # Load generator weights
     # -----------------------
+    # TODO: Fazer aquele rotina de detectar quais modelos estão disponíveis. Dependendo do nome, selecionar arquitetura de rede corretamente, para então logar os pesos.
     print('\nLoading the model...')
     # generator.load_weights('/home/nicolas/MEGA/workspace/cGAN/output/kitti_morphological/2019-09-02_10-29-44/weights_generator_bce.h5')
     # generator.load_weights('/home/nicolas/MEGA/workspace/cGAN/output/weights_generator_linear4.h5')
-    generator.load_weights('/home/nicolas/MEGA/workspace/cGAN/output/resnet/2019-09-13_11-03-36/weights_generator_bce.h5')
+    # generator.load_weights('/home/nicolas/MEGA/workspace/cGAN/output/resnet/2019-09-13_11-03-36/weights_generator_bce.h5')
+    generator.load_weights('/home/nicolas/MEGA/workspace/cGAN/output/resnet_raul/weights_generator_resnet.h5')
 
     count = 0
     while True:
