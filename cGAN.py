@@ -9,6 +9,7 @@ import time
 from datetime import datetime
 
 import cv2
+import keras
 import matplotlib.pyplot as plt
 import numpy as np
 import tensorflow as tf
@@ -119,7 +120,7 @@ def train():
     # -------------------------
     model = cGAN(img_shape, depth_shape)
 
-    optimizer = tf.keras.optimizers.Adam(learn_rate, beta)
+    optimizer = keras.optimizers.Adam(learn_rate, beta)
 
     # Build and compile the discriminator
     discriminator = model.build_discriminator()
@@ -128,12 +129,12 @@ def train():
                           optimizer=optimizer,
                           metrics=['accuracy'])
     # Build the generator
-    generator = model.build_generator()
+    generator = model.build_generator_resnet() # TODO: criar argumento pra trocar de rede mais facil
     generator.summary()
 
     # Input images and their conditioning images
-    img_A = tf.keras.Input(shape=depth_shape)
-    img_B = tf.keras.Input(shape=img_shape)
+    img_A = keras.Input(shape=depth_shape)
+    img_B = keras.Input(shape=img_shape)
 
     # By conditioning on B generate a fake version of A
     fake_A = generator(img_B)
@@ -144,7 +145,7 @@ def train():
     # Discriminators determines validity of translated images / condition pairs
     valid = discriminator([fake_A, img_B])
 
-    combined = tf.keras.Model(inputs=[img_A, img_B], outputs=[valid, fake_A])
+    combined = keras.Model(inputs=[img_A, img_B], outputs=[valid, fake_A])
     combined.summary()
     combined.compile(loss=['mse', 'mae'],
                      loss_weights=[1, 100],
@@ -228,7 +229,8 @@ def train():
                 # plt.close('all')
 
             # timer1 = -time.time()
-            sample_images()
+            if showImages:
+                sample_images()
             # timer1 += time.time()
             # print(timer1)
 
@@ -279,14 +281,15 @@ def test():
     # Model
     # --------
     model = cGAN(img_shape, depth_shape)
-    generator = model.build_generator()
+    generator = model.build_generator_resnet() # TODO: fazer esquema para saber qual rede logar
     generator.summary()
 
     # -----------------------
     # Load generator weights
     # -----------------------
     # generator.load_weights('/home/nicolas/MEGA/workspace/cGAN/output/kitti_morphological/2019-09-02_10-29-44/weights_generator_bce.h5')
-    generator.load_weights('/home/nicolas/MEGA/workspace/cGAN/output/weights_generator_linear4.h5')
+    # generator.load_weights('/home/nicolas/MEGA/workspace/cGAN/output/weights_generator_linear4.h5')
+    generator.load_weights('/home/nicolas/MEGA/workspace/cGAN/output/resnet/2019-09-13_11-03-36/weights_generator_bce.h5')
 
     # ------------
     # Predictions
