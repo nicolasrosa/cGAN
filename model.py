@@ -125,7 +125,7 @@ class cGAN:
         up4 = keras.layers.Conv2DTranspose(64, kernel_size=2, activation='relu', padding='same', strides=2)(conv3)
         conv4 = keras.layers.Conv2D(64, kernel_size=4, activation='relu', padding='same')(up4)
 
-        output_img = keras.layers.Conv2D(self.depth_shape[2], kernel_size=4, padding='same', activation='linear')(conv4)
+        output_img = keras.layers.Conv2D(self.depth_shape[2], kernel_size=4, padding='same', activation='relu')(conv4)
 
         return keras.Model(d0, output_img)
 

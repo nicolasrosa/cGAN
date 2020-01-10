@@ -19,6 +19,7 @@ from tqdm import tqdm
 from dataset_handler import load_dataset, load_and_scale_image, load_and_scale_depth, generate_depth_maps_eigen_split
 from evaluation import compute_errors
 from model import cGAN
+from loss import tf_mse_loss, tf_mae_loss
 
 # ================= #
 #  Global Variables #
@@ -33,10 +34,11 @@ sess = tf.Session(config=config)
 set_session(sess)  # set this TensorFlow session as the default
 
 # tf.logging.set_verbosity(tf.logging.ERROR)
+# tf.logging.set_verbosity(tf.logging.WARN)
 
 datetime_var = datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
 
-showImages = False  # TODO: create args
+showImages = True  # TODO: create args
 
 
 # ========== #
@@ -64,6 +66,14 @@ def args_handler():
     parser.add_argument("-a", "--mask", type=str, help="Set depth mask (50, 80 or None).", default="None")
     return parser.parse_args()
 
+
+def update_colorbar(cbar, img):
+    vmin, vmax = np.min(img), np.max(img)
+    cbar_ticks = np.linspace(vmin, vmax, num=7, endpoint=True)
+
+    cbar.set_clim(vmin, vmax)
+    cbar.set_ticks(cbar_ticks)
+    cbar.draw_all()
 
 # ====== #
 #  Train #
@@ -148,7 +158,8 @@ def train():
 
     combined = keras.Model(inputs=[img_A, img_B], outputs=[valid, fake_A])
     combined.summary()
-    combined.compile(loss=['mse', 'mae'],
+    combined.compile(loss=['mse', tf_mae_loss],
+                     # loss=['mse', 'mae'],
                      loss_weights=[1, 100],
                      optimizer=optimizer)
 
@@ -162,14 +173,6 @@ def train():
     # Adversarial loss ground truths
     valid = np.ones((batch_size,) + disc_patch)
     fake = np.zeros((batch_size,) + disc_patch)
-
-    def update_colorbar(cbar, img):
-        vmin, vmax = np.min(img), np.max(img)
-        cbar_ticks = np.linspace(vmin, vmax, num=7, endpoint=True)
-
-        cbar.set_clim(vmin, vmax)
-        cbar.set_ticks(cbar_ticks)
-        cbar.draw_all()
 
     for epoch in range(epochs):
         batch_start = 0
